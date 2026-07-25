@@ -1,0 +1,105 @@
+.journey-planner {
+  position: absolute;
+  top: 120rem;
+  left: 20rem;
+  width: 420rem;
+
+  border-radius: 8rem;
+  background: rgba(25, 31, 38, 0.96);
+  color: white;
+
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.journey-planner__header {
+  padding: 14rem 16rem;
+  font-size: 18rem;
+  font-weight: 600;
+
+  background: rgba(46, 57, 68, 0.95);
+}
+
+.journey-planner__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12rem;
+
+  padding: 16rem;
+}
+
+.journey-point {
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+
+  padding: 12rem;
+  border-radius: 6rem;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.journey-point__marker {
+  width: 14rem;
+  height: 14rem;
+  flex-shrink: 0;
+
+  border: 3rem solid white;
+  border-radius: 50%;
+}
+
+.journey-point__marker--start {
+  background: #3fb950;
+}
+
+.journey-point__marker--destination {
+  background: #f85149;
+}
+
+.journey-point__content {
+  flex: 1;
+}
+
+.journey-point__label {
+  font-size: 15rem;
+  font-weight: 600;
+}
+
+.journey-point__status {
+  margin-top: 3rem;
+  font-size: 12rem;
+  opacity: 0.7;
+}
+
+.journey-planner__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8rem;
+}
+
+.journey-button {
+  padding: 8rem 12rem;
+
+  border: none;
+  border-radius: 4rem;
+
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  cursor: pointer;
+}
+
+.journey-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.journey-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.journey-button--active {
+  background: rgba(72, 145, 220, 0.8);
+}
+
+.journey-button--primary {
+  background: rgba(48, 130, 210, 0.9);
+}

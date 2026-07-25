@@ -1,0 +1,5 @@
+CS2-JourneyPlanner/UI/node_modules/*
+CS2-JourneyPlanner/obj/*
+CS2-JourneyPlanner/bin/*
+CS2-JourneyPlanner/Library/*
+.vs/*

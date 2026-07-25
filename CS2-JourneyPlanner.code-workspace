@@ -1,0 +1,17 @@
+
+ {
+    "folders": [
+        {
+            "name": "Backend (C#)",
+            "path": "."
+        },
+        {
+            "name": "UI (TypeScript)",
+            "path": ".\\CS2-JourneyPlanner\\UI"
+        }
+    ],
+    "settings": {
+        "js/ts.tsdk.path": "Backend (C#)\\UI\\node_modules\\typescript\\lib",
+        "workbench.colorTheme": "Tokyo Night"
+    }
+}
