@@ -2,45 +2,40 @@ import React from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
 import "./journey-planner.scss";
 
-type SelectionMode = "none" | "start" | "destination";
+const bindingGroup = "JourneyPlanner";
 
-const selectionMode$ = bindValue<SelectionMode>(
-  "JourneyPlanner",
-  "SelectionMode",
-  "none"
+const connectionStatus$ = bindValue<string>(
+  bindingGroup,
+  "ConnectionStatus",
+  "Waiting for C#..."
 );
 
-const hasStart$ = bindValue<boolean>(
-  "JourneyPlanner",
-  "HasStart",
-  false
-);
-
-const hasDestination$ = bindValue<boolean>(
-  "JourneyPlanner",
-  "HasDestination",
-  false
+const contactCount$ = bindValue<number>(
+  bindingGroup,
+  "ContactCount",
+  0
 );
 
 export const JourneyPlanner = () => {
-    const selectionMode = useValue(selectionMode$);
-    const hasStart = useValue(hasStart$);
-    const hasDestination = useValue(hasDestination$);
+  const connectionStatus = useValue(connectionStatus$);
+  const contactCount = useValue(contactCount$);
 
-  const selectStart = () => {
-    trigger("JourneyPlanner", "SelectStart");
+  const testContact = () => {
+    console.log("[JourneyPlanner] Sending TestContact trigger");
+
+    trigger(
+      bindingGroup,
+      "TestContact"
+    );
   };
 
-  const selectDestination = () => {
-    trigger("JourneyPlanner", "SelectDestination");
-  };
+  const resetContact = () => {
+    console.log("[JourneyPlanner] Sending ResetContact trigger");
 
-  const calculateRoute = () => {
-    trigger("JourneyPlanner", "CalculateRoute");
-  };
-
-  const clearRoute = () => {
-    trigger("JourneyPlanner", "ClearRoute");
+    trigger(
+      bindingGroup,
+      "ResetContact"
+    );
   };
 
   return (
@@ -50,70 +45,35 @@ export const JourneyPlanner = () => {
       </div>
 
       <div className="journey-planner__body">
-        <div className="journey-point">
-          <div className="journey-point__marker journey-point__marker--start" />
-
-          <div className="journey-point__content">
-            <div className="journey-point__label">Start</div>
-
-            <div className="journey-point__status">
-              {hasStart ? "Point selected" : "No point selected"}
-            </div>
+        <div className="journey-contact-test">
+          <div className="journey-contact-test__title">
+            React ↔ C# contact test
           </div>
 
-          <button
-            className={
-              selectionMode === "start"
-                ? "journey-button journey-button--active"
-                : "journey-button"
-            }
-            onClick={selectStart}
-          >
-            {selectionMode === "start" ? "Click on map…" : "Select"}
-          </button>
-        </div>
-
-        <div className="journey-point">
-          <div className="journey-point__marker journey-point__marker--destination" />
-
-          <div className="journey-point__content">
-            <div className="journey-point__label">Destination</div>
-
-            <div className="journey-point__status">
-              {hasDestination ? "Point selected" : "No point selected"}
-            </div>
+          <div className="journey-contact-test__status">
+            {connectionStatus}
           </div>
 
-          <button
-            className={
-              selectionMode === "destination"
-                ? "journey-button journey-button--active"
-                : "journey-button"
-            }
-            onClick={selectDestination}
-          >
-            {selectionMode === "destination"
-              ? "Click on map…"
-              : "Select"}
-          </button>
-        </div>
+          <div className="journey-contact-test__count">
+            Successful calls: {contactCount}
+          </div>
 
-        <div className="journey-planner__actions">
-          <button
-            className="journey-button"
-            onClick={clearRoute}
-            disabled={!hasStart && !hasDestination}
-          >
-            Clear
-          </button>
+          <div className="journey-planner__actions">
+            <button
+              className="journey-button"
+              onClick={resetContact}
+              disabled={contactCount === 0}
+            >
+              Reset
+            </button>
 
-          <button
-            className="journey-button journey-button--primary"
-            onClick={calculateRoute}
-            disabled={!hasStart || !hasDestination}
-          >
-            Calculate walking route
-          </button>
+            <button
+              className="journey-button journey-button--primary"
+              onClick={testContact}
+            >
+              Test C# contact
+            </button>
+          </div>
         </div>
       </div>
     </div>

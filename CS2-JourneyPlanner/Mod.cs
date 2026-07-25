@@ -20,9 +20,7 @@ namespace CS2_JourneyPlanner
                 SystemUpdatePhase.UIUpdate
             );
 
-            updateSystem.UpdateAt<JourneyPlannerToolSystem>(
-                SystemUpdatePhase.ToolUpdate
-            );
+            log.Info("JourneyPlannerUISystem registered.");
 
         }
 

@@ -3,140 +3,76 @@ using Game.UI;
 
 namespace CS2_JourneyPlanner
 {
-    public enum SelectionMode
-    {
-        None,
-        Start,
-        Destination
-    }
-
     public sealed partial class JourneyPlannerUISystem : UISystemBase
     {
-        private ValueBinding<string> _selectionModeBinding;
-        private ValueBinding<bool> _hasStartBinding;
-        private ValueBinding<bool> _hasDestinationBinding;
+        private const string BindingGroup = "JourneyPlanner";
 
-        public SelectionMode CurrentSelectionMode { get; private set; }
+        private ValueBinding<string> _connectionStatusBinding;
+        private ValueBinding<int> _contactCountBinding;
 
-        public bool HasStart { get; private set; }
-        public bool HasDestination { get; private set; }
+        private int _contactCount;
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
-            _selectionModeBinding = new ValueBinding<string>(
-                "JourneyPlanner",
-                "SelectionMode",
-                "none"
+            Mod.log.Info("JourneyPlannerUISystem.OnCreate.");
+
+            _connectionStatusBinding = new ValueBinding<string>(
+                BindingGroup,
+                "ConnectionStatus",
+                "C# binding created"
             );
 
-            _hasStartBinding = new ValueBinding<bool>(
-                "JourneyPlanner",
-                "HasStart",
-                false
+            _contactCountBinding = new ValueBinding<int>(
+                BindingGroup,
+                "ContactCount",
+                0
             );
 
-            _hasDestinationBinding = new ValueBinding<bool>(
-                "JourneyPlanner",
-                "HasDestination",
-                false
+            AddBinding(_connectionStatusBinding);
+            AddBinding(_contactCountBinding);
+
+            AddBinding(
+                new TriggerBinding(
+                    BindingGroup,
+                    "TestContact",
+                    TestContact
+                )
             );
 
-            AddBinding(_selectionModeBinding);
-            AddBinding(_hasStartBinding);
-            AddBinding(_hasDestinationBinding);
-
-            AddBinding(new TriggerBinding(
-                "JourneyPlanner",
-                "SelectStart",
-                SelectStart
-            ));
-
-            AddBinding(new TriggerBinding(
-                "JourneyPlanner",
-                "SelectDestination",
-                SelectDestination
-            ));
-
-            AddBinding(new TriggerBinding(
-                "JourneyPlanner",
-                "ClearRoute",
-                ClearRoute
-            ));
-
-            AddBinding(new TriggerBinding(
-                "JourneyPlanner",
-                "CalculateRoute",
-                CalculateRoute
-            ));
-        }
-
-        private void SelectStart()
-        {
-            SetSelectionMode(SelectionMode.Start);
-            Mod.log.Info("Waiting for start-point selection.");
-        }
-
-        private void SelectDestination()
-        {
-            SetSelectionMode(SelectionMode.Destination);
-            Mod.log.Info("Waiting for destination selection.");
-        }
-
-        private void ClearRoute()
-        {
-            HasStart = false;
-            HasDestination = false;
-
-            _hasStartBinding.Update(false);
-            _hasDestinationBinding.Update(false);
-
-            SetSelectionMode(SelectionMode.None);
-
-            Mod.log.Info("Journey points cleared.");
-        }
-
-        private void CalculateRoute()
-        {
-            Mod.log.Info(
-                $"Calculate requested. Start={HasStart}, Destination={HasDestination}"
+            AddBinding(
+                new TriggerBinding(
+                    BindingGroup,
+                    "ResetContact",
+                    ResetContact
+                )
             );
+
+            Mod.log.Info("Journey Planner UI bindings added.");
         }
 
-        public void ConfirmSelection()
+        private void TestContact()
         {
-            switch (CurrentSelectionMode)
-            {
-                case SelectionMode.Start:
-                    HasStart = true;
-                    _hasStartBinding.Update(true);
-                    break;
+            _contactCount++;
 
-                case SelectionMode.Destination:
-                    HasDestination = true;
-                    _hasDestinationBinding.Update(true);
-                    break;
+            string message =
+                $"Contact confirmed. React called C# {_contactCount} time(s).";
 
-                default:
-                    return;
-            }
+            Mod.log.Info(message);
 
-            SetSelectionMode(SelectionMode.None);
+            _contactCountBinding.Update(_contactCount);
+            _connectionStatusBinding.Update(message);
         }
 
-        private void SetSelectionMode(SelectionMode mode)
+        private void ResetContact()
         {
-            CurrentSelectionMode = mode;
+            _contactCount = 0;
 
-            string uiValue = mode switch
-            {
-                SelectionMode.Start => "start",
-                SelectionMode.Destination => "destination",
-                _ => "none"
-            };
+            Mod.log.Info("Contact test reset.");
 
-            _selectionModeBinding.Update(uiValue);
+            _contactCountBinding.Update(0);
+            _connectionStatusBinding.Update("Contact test reset");
         }
     }
 }
