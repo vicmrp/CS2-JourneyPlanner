@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using Game.Common;
 using Game.Net;
 using Game.Prefabs;
 using Game.Tools;
 using Unity.Entities;
 using Unity.Jobs;
+using Unity.Mathematics;
 
 namespace CS2_JourneyPlanner
 {
@@ -12,23 +14,23 @@ namespace CS2_JourneyPlanner
     {
         private JourneyPlannerUISystem _uiSystem;
 
-        private Entity _lastHoveredEntity;
-        private int _updateCount;
         private bool _raycastInitializationLogged;
 
-        public override string toolID => "JourneyPlannerTool";
+        public override string toolID =>
+            "JourneyPlannerTool";
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
             _uiSystem =
-                World.GetOrCreateSystemManaged<JourneyPlannerUISystem>();
+                World.GetOrCreateSystemManaged<
+                    JourneyPlannerUISystem
+                >();
 
-            _lastHoveredEntity = Entity.Null;
-            _updateCount = 0;
-
-            Mod.Log.Info("JourneyPlannerToolSystem.OnCreate.");
+            Mod.Log.Info(
+                "JourneyPlannerToolSystem.OnCreate."
+            );
         }
 
         protected override void OnStartRunning()
@@ -38,20 +40,19 @@ namespace CS2_JourneyPlanner
             applyAction.shouldBeEnabled = true;
             cancelAction.shouldBeEnabled = true;
 
-            _updateCount = 0;
-            _lastHoveredEntity = Entity.Null;
-
             Mod.Log.Info(
-                "Journey Planner tool activated. " +
-                "Apply and cancel actions enabled."
+                "Journey Planner tool activated."
             );
         }
 
         protected override void OnStopRunning()
         {
-            Mod.Log.Info("Journey Planner tool deactivated.");
+            applyAction.shouldBeEnabled = false;
+            cancelAction.shouldBeEnabled = false;
 
-            _lastHoveredEntity = Entity.Null;
+            Mod.Log.Info(
+                "Journey Planner tool deactivated."
+            );
 
             base.OnStopRunning();
         }
@@ -61,7 +62,9 @@ namespace CS2_JourneyPlanner
             return null;
         }
 
-        public override bool TrySetPrefab(PrefabBase prefab)
+        public override bool TrySetPrefab(
+            PrefabBase prefab
+        )
         {
             return false;
         }
@@ -71,129 +74,268 @@ namespace CS2_JourneyPlanner
             base.InitializeRaycast();
 
             /*
-             * Debug configuration:
-             * accept every TypeMask and every network layer.
+             * Version 0.1c still uses broad masks.
              *
-             * Later we will replace this with road-specific masks.
+             * The raw click is inspected and validated after
+             * the raycast result has been received.
              */
-            m_ToolRaycastSystem.typeMask = unchecked((TypeMask)(-1));
-            m_ToolRaycastSystem.netLayerMask = unchecked((Layer)(-1));
+            m_ToolRaycastSystem.typeMask =
+                unchecked((TypeMask)uint.MaxValue);
 
-            if (!_raycastInitializationLogged)
+            m_ToolRaycastSystem.netLayerMask =
+                unchecked((Layer)uint.MaxValue);
+
+            if (_raycastInitializationLogged)
             {
-                _raycastInitializationLogged = true;
-
-                Mod.Log.Info(
-                    "Journey Planner raycast initialized with broad debug masks."
-                );
+                return;
             }
+
+            _raycastInitializationLogged = true;
+
+            Mod.Log.Info(
+                "Journey Planner raycast initialized " +
+                "with broad debug masks."
+            );
         }
 
-        protected override JobHandle OnUpdate(JobHandle inputDeps)
+        protected override JobHandle OnUpdate(
+            JobHandle inputDeps
+        )
         {
-            _updateCount++;
+            bool cancelPressed =
+                cancelAction.WasPressedThisFrame();
+
+            if (cancelPressed)
+            {
+                HandleCancel();
+
+                return inputDeps;
+            }
 
             bool applyPressed =
                 applyAction.WasPressedThisFrame();
 
-            bool cancelPressed =
-                cancelAction.WasPressedThisFrame();
+            if (!applyPressed)
+            {
+                return inputDeps;
+            }
 
+            ProcessMapClick();
+
+            return inputDeps;
+        }
+
+        private void ProcessMapClick()
+        {
             bool hasResult = GetRaycastResult(
                 out Entity owner,
                 out Game.Common.RaycastHit hit
             );
 
+            Mod.Log.Info(
+                $"Apply action pressed. " +
+                $"HasRaycastResult={hasResult}"
+            );
+
+            if (!hasResult)
+            {
+                RejectPoint(
+                    "No surface was found under the cursor."
+                );
+
+                return;
+            }
+
+            float3 position = hit.m_HitPosition;
+
+            string entityType =
+                GetEntityDescription(owner);
+
+            LogSelectionDiagnostics(
+                owner,
+                position,
+                entityType
+            );
+
+            if (
+                !TryValidatePoint(
+                    owner,
+                    position,
+                    out string rejectionReason
+                )
+            )
+            {
+                RejectPoint(rejectionReason);
+
+                return;
+            }
+
+            Mod.Log.Info(
+                $"Map point accepted. " +
+                $"Owner={owner}, " +
+                $"Type={entityType}, " +
+                $"Position=({position.x:F1}, " +
+                $"{position.y:F1}, " +
+                $"{position.z:F1})"
+            );
+
+            _uiSystem.ConfirmSelection(
+                owner,
+                position,
+                entityType
+            );
+        }
+
+        private bool TryValidatePoint(
+            Entity owner,
+            float3 position,
+            out string rejectionReason
+        )
+        {
+            if (!math.all(math.isfinite(position)))
+            {
+                rejectionReason =
+                    "The selected position contains invalid coordinates.";
+
+                return false;
+            }
+
             /*
-             * Report that the system is actually updating.
-             * Approximately once every 300 updates.
+             * A raycast may return Entity.Null when the terrain itself
+             * is selected. Terrain points are allowed in version 0.1c.
+             *
+             * Network snapping will determine whether the point can
+             * actually be used for pedestrian routing in a later version.
              */
-            if (_updateCount % 300 == 0)
+
+            rejectionReason = string.Empty;
+
+            return true;
+        }
+
+        private string GetEntityDescription(Entity entity)
+        {
+            if (entity == Entity.Null)
+            {
+                return "Terrain or unowned surface";
+            }
+
+            List<string> types = new List<string>();
+
+            if (EntityManager.HasComponent<Node>(entity))
+            {
+                types.Add("Network node");
+            }
+
+            if (EntityManager.HasComponent<Edge>(entity))
+            {
+                types.Add("Network edge");
+            }
+
+            if (
+                EntityManager.HasComponent<
+                    Game.Buildings.Building
+                >(entity)
+            )
+            {
+                types.Add("Building");
+            }
+
+            if (
+                EntityManager.HasComponent<
+                    Game.Common.Owner
+                >(entity)
+            )
+            {
+                types.Add("Owned entity");
+            }
+
+            if (types.Count == 0)
+            {
+                return "Other map entity";
+            }
+
+            return string.Join(", ", types);
+        }
+
+        private void LogSelectionDiagnostics(
+            Entity entity,
+            float3 position,
+            string entityType
+        )
+        {
+            if (entity == Entity.Null)
             {
                 Mod.Log.Info(
-                    $"Journey tool update heartbeat. " +
-                    $"Updates={_updateCount}, " +
-                    $"HasRaycastResult={hasResult}"
-                );
-            }
-
-            if (hasResult)
-            {
-                var position = hit.m_HitPosition;
-
-                if (owner != _lastHoveredEntity)
-                {
-                    _lastHoveredEntity = owner;
-
-                    Mod.Log.Info(
-                        $"Hover result changed. " +
-                        $"Owner={owner}, " +
-                        $"Position=({position.x:F1}, " +
-                        $"{position.y:F1}, " +
-                        $"{position.z:F1})"
-                    );
-                }
-            }
-
-            if (applyPressed)
-            {
-                Mod.Log.Info(
-                    $"Apply action pressed. " +
-                    $"HasRaycastResult={hasResult}"
+                    $"Selection diagnostics: " +
+                    $"Owner=Entity.Null, " +
+                    $"Type={entityType}, " +
+                    $"Position=({position.x:F1}, " +
+                    $"{position.y:F1}, " +
+                    $"{position.z:F1})"
                 );
 
-                if (!hasResult)
-                {
-                    Mod.Log.Warn(
-                        "Map click was detected, but the raycast " +
-                        "did not return a valid point."
-                    );
-                }
-                else
-                {
-                    var position = hit.m_HitPosition;
-
-                    Mod.Log.Info(
-                        $"Map point selected. " +
-                        $"Owner={owner}, " +
-                        $"Position=({position.x:F1}, " +
-                        $"{position.y:F1}, " +
-                        $"{position.z:F1})"
-                    );
-
-                    _uiSystem.ConfirmSelection(
-                        owner,
-                        position
-                    );
-                }
+                return;
             }
 
-            if (cancelPressed)
-            {
-                Mod.Log.Info(
-                    "Cancel action pressed."
-                );
+            bool hasNode =
+                EntityManager.HasComponent<Node>(entity);
 
-                _uiSystem.CancelSelection();
-                ReturnToDefaultTool();
-            }
+            bool hasEdge =
+                EntityManager.HasComponent<Edge>(entity);
 
-            return inputDeps;
+            bool hasBuilding =
+                EntityManager.HasComponent<
+                    Game.Buildings.Building
+                >(entity);
+
+            bool hasOwner =
+                EntityManager.HasComponent<
+                    Game.Common.Owner
+                >(entity);
+
+            Mod.Log.Info(
+                $"Selection diagnostics: " +
+                $"Owner={entity}, " +
+                $"Type={entityType}, " +
+                $"Node={hasNode}, " +
+                $"Edge={hasEdge}, " +
+                $"Building={hasBuilding}, " +
+                $"OwnerComponent={hasOwner}, " +
+                $"Position=({position.x:F1}, " +
+                $"{position.y:F1}, " +
+                $"{position.z:F1})"
+            );
+        }
+
+        private void RejectPoint(string reason)
+        {
+            Mod.Log.Warn(
+                $"Map point rejected. Reason={reason}"
+            );
+
+            _uiSystem.RejectSelection(reason);
+        }
+
+        private void HandleCancel()
+        {
+            Mod.Log.Info("Cancel action pressed.");
+
+            _uiSystem.CancelSelection();
+
+            ReturnToDefaultTool();
         }
 
         public void ReturnToDefaultTool()
         {
             if (m_ToolSystem.activeTool != this)
             {
-                Mod.Log.Info(
-                    "ReturnToDefaultTool ignored because " +
-                    "Journey Planner is not active."
-                );
-
                 return;
             }
 
-            Mod.Log.Info("Returning to DefaultToolSystem.");
+            Mod.Log.Info(
+                "Returning to DefaultToolSystem."
+            );
 
             m_ToolSystem.activeTool =
                 m_DefaultToolSystem;

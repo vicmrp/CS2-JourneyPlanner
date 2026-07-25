@@ -5,16 +5,27 @@ using Game.SceneFlow;
 
 namespace CS2_JourneyPlanner
 {
-    public class Mod : IMod
+    public sealed class Mod : IMod
     {
-        public static ILog Log = LogManager.GetLogger($"{nameof(CS2_JourneyPlanner)}.{nameof(Mod)}").SetShowsErrorsInUI(false);
+        public const string Version = "0.1c";
+
+        public static readonly ILog Log = LogManager
+            .GetLogger($"{nameof(CS2_JourneyPlanner)}.{nameof(Mod)}")
+            .SetShowsErrorsInUI(false);
 
         public void OnLoad(UpdateSystem updateSystem)
         {
-            Log.Info(nameof(OnLoad));
+            Log.Info($"Journey Planner v{Version} loading.");
 
-            if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
+            if (
+                GameManager.instance.modManager.TryGetExecutableAsset(
+                    this,
+                    out var asset
+                )
+            )
+            {
                 Log.Info($"Current mod asset at {asset.path}");
+            }
 
             updateSystem.UpdateAt<JourneyPlannerUISystem>(
                 SystemUpdatePhase.UIUpdate
@@ -25,12 +36,11 @@ namespace CS2_JourneyPlanner
             );
 
             Log.Info("Journey Planner systems registered.");
-
         }
 
         public void OnDispose()
         {
-            Log.Info(nameof(OnDispose));
+            Log.Info($"Journey Planner v{Version} disposed.");
         }
     }
 }
