@@ -31,6 +31,9 @@
 		<Reference Include="UnityEngine.CoreModule">
 			<Private>false</Private>
 		</Reference>
+		<!-- <Reference Include="UnityEngine.PhysicsModule">
+			<Private>false</Private>
+		</Reference> -->
 		<Reference Include="Unity.Burst">
 			<Private>false</Private>
 		</Reference>
