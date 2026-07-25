@@ -2,6 +2,7 @@
 
 	<PropertyGroup>
 		<Configurations>Debug;Release</Configurations>
+		<TargetFramework>net48</TargetFramework>
 	
 		<!--The file where mod information which is required for publishing mod on PDX mods are stored-->
 		<PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
@@ -22,6 +23,9 @@
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="Colossal.IO.AssetDatabase">
+			<Private>false</Private>
+		</Reference>
+		<Reference Include="Colossal.UI.Binding">
 			<Private>false</Private>
 		</Reference>
 		<Reference Include="UnityEngine.CoreModule">

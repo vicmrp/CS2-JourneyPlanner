@@ -16,6 +16,14 @@ namespace CS2_JourneyPlanner
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
                 log.Info($"Current mod asset at {asset.path}");
 
+            updateSystem.UpdateAt<JourneyPlannerUISystem>(
+                SystemUpdatePhase.UIUpdate
+            );
+
+            updateSystem.UpdateAt<JourneyPlannerToolSystem>(
+                SystemUpdatePhase.ToolUpdate
+            );
+
         }
 
         public void OnDispose()
