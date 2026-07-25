@@ -13,118 +13,172 @@ namespace CS2_JourneyPlanner
         Destination
     }
 
-    public sealed partial class JourneyPlannerUISystem : UISystemBase
+    public sealed partial class JourneyPlannerUISystem
+        : UISystemBase
     {
-        private const string BindingGroup = "JourneyPlanner";
+        private const string BindingGroup =
+            "JourneyPlanner";
 
-        private ValueBinding<string> _selectionModeBinding;
-        private ValueBinding<bool> _hasStartBinding;
-        private ValueBinding<bool> _hasDestinationBinding;
+        private ValueBinding<string>
+            _selectionModeBinding;
 
-        private ValueBinding<string> _statusBinding;
+        private ValueBinding<bool>
+            _hasStartBinding;
 
-        private ValueBinding<string> _startPositionBinding;
-        private ValueBinding<string> _destinationPositionBinding;
+        private ValueBinding<bool>
+            _hasDestinationBinding;
 
-        private ValueBinding<string> _startEntityTypeBinding;
-        private ValueBinding<string> _destinationEntityTypeBinding;
+        private ValueBinding<string>
+            _statusBinding;
+
+        private ValueBinding<string>
+            _startPositionBinding;
+
+        private ValueBinding<string>
+            _destinationPositionBinding;
+
+        private ValueBinding<string>
+            _startEntityTypeBinding;
+
+        private ValueBinding<string>
+            _destinationEntityTypeBinding;
 
         private ToolSystem _toolSystem;
-        private JourneyPlannerToolSystem _journeyToolSystem;
 
-        public SelectionMode CurrentSelectionMode { get; private set; }
+        private JourneyPlannerToolSystem
+            _journeyToolSystem;
 
-        public bool HasStart { get; private set; }
+        public SelectionMode CurrentSelectionMode
+        {
+            get;
+            private set;
+        }
 
-        public bool HasDestination { get; private set; }
+        public bool HasStart
+        {
+            get;
+            private set;
+        }
 
-        public Entity StartOwner { get; private set; }
+        public bool HasDestination
+        {
+            get;
+            private set;
+        }
 
-        public Entity DestinationOwner { get; private set; }
+        public Entity StartOwner
+        {
+            get;
+            private set;
+        }
 
-        public float3 StartPosition { get; private set; }
+        public Entity DestinationOwner
+        {
+            get;
+            private set;
+        }
 
-        public float3 DestinationPosition { get; private set; }
+        public float3 StartPosition
+        {
+            get;
+            private set;
+        }
 
-        public string StartEntityType { get; private set; }
-
-        public string DestinationEntityType { get; private set; }
+        public float3 DestinationPosition
+        {
+            get;
+            private set;
+        }
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
-            Mod.Log.Info("JourneyPlannerUISystem.OnCreate.");
+            Mod.Log.Info(
+                "JourneyPlannerUISystem.OnCreate."
+            );
 
             _toolSystem =
-                World.GetOrCreateSystemManaged<ToolSystem>();
+                World.GetOrCreateSystemManaged<
+                    ToolSystem
+                >();
 
             _journeyToolSystem =
-                World.GetOrCreateSystemManaged<JourneyPlannerToolSystem>();
+                World.GetOrCreateSystemManaged<
+                    JourneyPlannerToolSystem
+                >();
 
-            CurrentSelectionMode = SelectionMode.None;
+            CurrentSelectionMode =
+                SelectionMode.None;
 
             StartOwner = Entity.Null;
             DestinationOwner = Entity.Null;
 
-            StartEntityType = string.Empty;
-            DestinationEntityType = string.Empty;
+            CreateValueBindings();
+            CreateTriggerBindings();
 
-            CreateBindings();
-            RegisterTriggers();
-
-            Mod.Log.Info("Journey Planner UI bindings added.");
+            Mod.Log.Info(
+                "Journey Planner UI bindings added."
+            );
         }
 
-        private void CreateBindings()
+        private void CreateValueBindings()
         {
-            _selectionModeBinding = new ValueBinding<string>(
-                BindingGroup,
-                "SelectionMode",
-                "none"
-            );
+            _selectionModeBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "SelectionMode",
+                    "none"
+                );
 
-            _hasStartBinding = new ValueBinding<bool>(
-                BindingGroup,
-                "HasStart",
-                false
-            );
+            _hasStartBinding =
+                new ValueBinding<bool>(
+                    BindingGroup,
+                    "HasStart",
+                    false
+                );
 
-            _hasDestinationBinding = new ValueBinding<bool>(
-                BindingGroup,
-                "HasDestination",
-                false
-            );
+            _hasDestinationBinding =
+                new ValueBinding<bool>(
+                    BindingGroup,
+                    "HasDestination",
+                    false
+                );
 
-            _statusBinding = new ValueBinding<string>(
-                BindingGroup,
-                "Status",
-                "Select a starting point"
-            );
+            _statusBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "Status",
+                    "Select a starting road"
+                );
 
-            _startPositionBinding = new ValueBinding<string>(
-                BindingGroup,
-                "StartPosition",
-                string.Empty
-            );
+            _startPositionBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "StartPosition",
+                    string.Empty
+                );
 
-            _destinationPositionBinding = new ValueBinding<string>(
-                BindingGroup,
-                "DestinationPosition",
-                string.Empty
-            );
+            _destinationPositionBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "DestinationPosition",
+                    string.Empty
+                );
 
-            _startEntityTypeBinding = new ValueBinding<string>(
-                BindingGroup,
-                "StartEntityType",
-                string.Empty
-            );
+            _startEntityTypeBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "StartEntityType",
+                    string.Empty
+                );
 
-            _destinationEntityTypeBinding = new ValueBinding<string>(
-                BindingGroup,
-                "DestinationEntityType",
-                string.Empty
-            );
+            _destinationEntityTypeBinding =
+                new ValueBinding<string>(
+                    BindingGroup,
+                    "DestinationEntityType",
+                    string.Empty
+                );
 
             AddBinding(_selectionModeBinding);
             AddBinding(_hasStartBinding);
@@ -136,7 +190,7 @@ namespace CS2_JourneyPlanner
             AddBinding(_destinationEntityTypeBinding);
         }
 
-        private void RegisterTriggers()
+        private void CreateTriggerBindings()
         {
             AddBinding(
                 new TriggerBinding(
@@ -173,39 +227,50 @@ namespace CS2_JourneyPlanner
 
         private void SelectStart()
         {
-            Mod.Log.Info("SelectStart trigger received.");
+            Mod.Log.Info(
+                "SelectStart trigger received."
+            );
 
             BeginSelection(
                 SelectionMode.Start,
-                "Click on the map to select the starting point"
+                "Click a road to select the starting point"
             );
         }
 
         private void SelectDestination()
         {
-            Mod.Log.Info("SelectDestination trigger received.");
+            Mod.Log.Info(
+                "SelectDestination trigger received."
+            );
 
             BeginSelection(
                 SelectionMode.Destination,
-                "Click on the map to select the destination"
+                "Click a road to select the destination"
             );
         }
 
         private void BeginSelection(
-            SelectionMode mode,
+            SelectionMode selectionMode,
             string status
         )
         {
-            SetSelectionMode(mode);
-
+            SetSelectionMode(selectionMode);
             _statusBinding.Update(status);
+
+            Mod.Log.Info(
+                $"Selection mode changed to " +
+                $"{selectionMode}."
+            );
 
             ActivateJourneyTool();
         }
 
         private void ActivateJourneyTool()
         {
-            if (_toolSystem.activeTool == _journeyToolSystem)
+            if (
+                _toolSystem.activeTool ==
+                _journeyToolSystem
+            )
             {
                 Mod.Log.Info(
                     "Journey Planner tool is already active."
@@ -214,21 +279,27 @@ namespace CS2_JourneyPlanner
                 return;
             }
 
-            Mod.Log.Info("Activating Journey Planner tool.");
+            Mod.Log.Info(
+                "Activating Journey Planner tool."
+            );
 
-            _toolSystem.activeTool = _journeyToolSystem;
+            _toolSystem.activeTool =
+                _journeyToolSystem;
         }
 
-        public void ConfirmSelection(
-            Entity owner,
-            float3 position,
-            string entityType
+        public void ConfirmRoadSelection(
+            Entity roadEntity,
+            float3 position
         )
         {
-            if (CurrentSelectionMode == SelectionMode.None)
+            if (
+                CurrentSelectionMode ==
+                SelectionMode.None
+            )
             {
                 Mod.Log.Warn(
-                    "ConfirmSelection called without an active selection mode."
+                    "ConfirmRoadSelection called without " +
+                    "an active selection mode."
                 );
 
                 return;
@@ -240,75 +311,70 @@ namespace CS2_JourneyPlanner
             switch (CurrentSelectionMode)
             {
                 case SelectionMode.Start:
-                    StoreStartPoint(
-                        owner,
+                    StoreStartRoad(
+                        roadEntity,
                         position,
-                        formattedPosition,
-                        entityType
+                        formattedPosition
                     );
                     break;
 
                 case SelectionMode.Destination:
-                    StoreDestinationPoint(
-                        owner,
+                    StoreDestinationRoad(
+                        roadEntity,
                         position,
-                        formattedPosition,
-                        entityType
+                        formattedPosition
                     );
                     break;
+
+                default:
+                    return;
             }
 
-            SetSelectionMode(SelectionMode.None);
+            SetSelectionMode(
+                SelectionMode.None
+            );
+
             UpdateReadyStatus();
 
-            _journeyToolSystem.ReturnToDefaultTool();
+            _journeyToolSystem
+                .ReturnToDefaultTool();
         }
 
-        public void RejectSelection(string reason)
-        {
-            Mod.Log.Warn(
-                $"Journey point rejected: {reason}"
-            );
-
-            _statusBinding.Update(
-                $"Invalid point: {reason}"
-            );
-        }
-
-        private void StoreStartPoint(
-            Entity owner,
+        private void StoreStartRoad(
+            Entity roadEntity,
             float3 position,
-            string formattedPosition,
-            string entityType
+            string formattedPosition
         )
         {
-            StartOwner = owner;
+            StartOwner = roadEntity;
             StartPosition = position;
-            StartEntityType = entityType;
             HasStart = true;
 
             _hasStartBinding.Update(true);
-            _startPositionBinding.Update(formattedPosition);
-            _startEntityTypeBinding.Update(entityType);
+
+            _startPositionBinding.Update(
+                formattedPosition
+            );
+
+            _startEntityTypeBinding.Update(
+                "Road"
+            );
 
             Mod.Log.Info(
-                $"Start selected. " +
-                $"Owner={owner}, " +
-                $"Type={entityType}, " +
+                $"Start road selected. " +
+                $"Entity={roadEntity}, " +
                 $"Position={formattedPosition}"
             );
         }
 
-        private void StoreDestinationPoint(
-            Entity owner,
+        private void StoreDestinationRoad(
+            Entity roadEntity,
             float3 position,
-            string formattedPosition,
-            string entityType
+            string formattedPosition
         )
         {
-            DestinationOwner = owner;
+            DestinationOwner = roadEntity;
             DestinationPosition = position;
-            DestinationEntityType = entityType;
             HasDestination = true;
 
             _hasDestinationBinding.Update(true);
@@ -318,28 +384,51 @@ namespace CS2_JourneyPlanner
             );
 
             _destinationEntityTypeBinding.Update(
-                entityType
+                "Road"
             );
 
             Mod.Log.Info(
-                $"Destination selected. " +
-                $"Owner={owner}, " +
-                $"Type={entityType}, " +
+                $"Destination road selected. " +
+                $"Entity={roadEntity}, " +
                 $"Position={formattedPosition}"
             );
         }
 
+        public void RejectSelection(
+            string reason
+        )
+        {
+            Mod.Log.Warn(
+                $"Road selection rejected: {reason}"
+            );
+
+            _statusBinding.Update(reason);
+
+            /*
+             * The selection mode is deliberately not reset.
+             * The custom tool stays active so the user can
+             * click another location.
+             */
+        }
+
         public void CancelSelection()
         {
-            Mod.Log.Info("Map selection cancelled.");
+            Mod.Log.Info(
+                "Map selection cancelled."
+            );
 
-            SetSelectionMode(SelectionMode.None);
+            SetSelectionMode(
+                SelectionMode.None
+            );
+
             UpdateReadyStatus();
         }
 
         private void ClearRoute()
         {
-            Mod.Log.Info("ClearRoute trigger received.");
+            Mod.Log.Info(
+                "ClearRoute trigger received."
+            );
 
             HasStart = false;
             HasDestination = false;
@@ -350,27 +439,39 @@ namespace CS2_JourneyPlanner
             StartPosition = default;
             DestinationPosition = default;
 
-            StartEntityType = string.Empty;
-            DestinationEntityType = string.Empty;
-
             _hasStartBinding.Update(false);
             _hasDestinationBinding.Update(false);
 
-            _startPositionBinding.Update(string.Empty);
-            _destinationPositionBinding.Update(string.Empty);
+            _startPositionBinding.Update(
+                string.Empty
+            );
 
-            _startEntityTypeBinding.Update(string.Empty);
-            _destinationEntityTypeBinding.Update(string.Empty);
+            _destinationPositionBinding.Update(
+                string.Empty
+            );
 
-            SetSelectionMode(SelectionMode.None);
+            _startEntityTypeBinding.Update(
+                string.Empty
+            );
+
+            _destinationEntityTypeBinding.Update(
+                string.Empty
+            );
+
+            SetSelectionMode(
+                SelectionMode.None
+            );
 
             _statusBinding.Update(
                 "Journey points cleared"
             );
 
-            _journeyToolSystem.ReturnToDefaultTool();
+            _journeyToolSystem
+                .ReturnToDefaultTool();
 
-            Mod.Log.Info("Journey points cleared.");
+            Mod.Log.Info(
+                "Journey points cleared."
+            );
         }
 
         private void CalculateRoute()
@@ -381,35 +482,42 @@ namespace CS2_JourneyPlanner
                 $"Destination={HasDestination}"
             );
 
-            if (!HasStart || !HasDestination)
+            if (
+                !HasStart ||
+                !HasDestination
+            )
             {
                 _statusBinding.Update(
-                    "Select both points before calculating"
+                    "Select both roads before calculating"
                 );
 
                 return;
             }
 
             _statusBinding.Update(
-                "Both positions are stored. " +
-                "Network snapping is not implemented yet."
+                "Both roads are stored. " +
+                "Pathfinding is not implemented yet."
             );
 
             Mod.Log.Info(
-                $"Ready for network snapping. " +
+                $"Ready for pathfinding. " +
+                $"StartEntity={StartOwner}, " +
                 $"Start={FormatPosition(StartPosition)}, " +
-                $"StartType={StartEntityType}, " +
-                $"Destination={FormatPosition(DestinationPosition)}, " +
-                $"DestinationType={DestinationEntityType}"
+                $"DestinationEntity={DestinationOwner}, " +
+                $"Destination={FormatPosition(DestinationPosition)}"
             );
         }
 
         private void UpdateReadyStatus()
         {
-            if (HasStart && HasDestination)
+            if (
+                HasStart &&
+                HasDestination
+            )
             {
                 _statusBinding.Update(
-                    "Both points selected. Ready to calculate route."
+                    "Both roads selected. " +
+                    "Ready to calculate route."
                 );
 
                 return;
@@ -418,7 +526,8 @@ namespace CS2_JourneyPlanner
             if (HasStart)
             {
                 _statusBinding.Update(
-                    "Starting point selected. Select a destination."
+                    "Starting road selected. " +
+                    "Select a destination road."
                 );
 
                 return;
@@ -427,39 +536,46 @@ namespace CS2_JourneyPlanner
             if (HasDestination)
             {
                 _statusBinding.Update(
-                    "Destination selected. Select a starting point."
+                    "Destination road selected. " +
+                    "Select a starting road."
                 );
 
                 return;
             }
 
             _statusBinding.Update(
-                "Select a starting point"
+                "Select a starting road"
             );
         }
 
-        private void SetSelectionMode(SelectionMode mode)
+        private void SetSelectionMode(
+            SelectionMode selectionMode
+        )
         {
-            CurrentSelectionMode = mode;
+            CurrentSelectionMode =
+                selectionMode;
 
-            string value;
+            string bindingValue;
 
-            switch (mode)
+            switch (selectionMode)
             {
                 case SelectionMode.Start:
-                    value = "start";
+                    bindingValue = "start";
                     break;
 
                 case SelectionMode.Destination:
-                    value = "destination";
+                    bindingValue =
+                        "destination";
                     break;
 
                 default:
-                    value = "none";
+                    bindingValue = "none";
                     break;
             }
 
-            _selectionModeBinding.Update(value);
+            _selectionModeBinding.Update(
+                bindingValue
+            );
         }
 
         private static string FormatPosition(

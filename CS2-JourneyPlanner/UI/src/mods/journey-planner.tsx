@@ -16,55 +16,64 @@ type JourneyPointType =
   | "start"
   | "destination";
 
-const bindingGroup = "JourneyPlanner";
+const bindingGroup =
+  "JourneyPlanner";
 
-const selectionMode$ = bindValue<SelectionMode>(
-  bindingGroup,
-  "SelectionMode",
-  "none"
-);
+const selectionMode$ =
+  bindValue<SelectionMode>(
+    bindingGroup,
+    "SelectionMode",
+    "none"
+  );
 
-const hasStart$ = bindValue<boolean>(
-  bindingGroup,
-  "HasStart",
-  false
-);
+const hasStart$ =
+  bindValue<boolean>(
+    bindingGroup,
+    "HasStart",
+    false
+  );
 
-const hasDestination$ = bindValue<boolean>(
-  bindingGroup,
-  "HasDestination",
-  false
-);
+const hasDestination$ =
+  bindValue<boolean>(
+    bindingGroup,
+    "HasDestination",
+    false
+  );
 
-const status$ = bindValue<string>(
-  bindingGroup,
-  "Status",
-  "Select a starting point"
-);
+const status$ =
+  bindValue<string>(
+    bindingGroup,
+    "Status",
+    "Select a starting road"
+  );
 
-const startPosition$ = bindValue<string>(
-  bindingGroup,
-  "StartPosition",
-  ""
-);
+const startPosition$ =
+  bindValue<string>(
+    bindingGroup,
+    "StartPosition",
+    ""
+  );
 
-const destinationPosition$ = bindValue<string>(
-  bindingGroup,
-  "DestinationPosition",
-  ""
-);
+const destinationPosition$ =
+  bindValue<string>(
+    bindingGroup,
+    "DestinationPosition",
+    ""
+  );
 
-const startEntityType$ = bindValue<string>(
-  bindingGroup,
-  "StartEntityType",
-  ""
-);
+const startEntityType$ =
+  bindValue<string>(
+    bindingGroup,
+    "StartEntityType",
+    ""
+  );
 
-const destinationEntityType$ = bindValue<string>(
-  bindingGroup,
-  "DestinationEntityType",
-  ""
-);
+const destinationEntityType$ =
+  bindValue<string>(
+    bindingGroup,
+    "DestinationEntityType",
+    ""
+  );
 
 export const JourneyPlanner = () => {
   const selectionMode =
@@ -89,7 +98,9 @@ export const JourneyPlanner = () => {
     useValue(startEntityType$);
 
   const destinationEntityType =
-    useValue(destinationEntityType$);
+    useValue(
+      destinationEntityType$
+    );
 
   const selectStart = () => {
     console.log(
@@ -135,7 +146,7 @@ export const JourneyPlanner = () => {
     );
   };
 
-  const bothPointsSelected =
+  const bothRoadsSelected =
     hasStart && hasDestination;
 
   return (
@@ -165,12 +176,19 @@ export const JourneyPlanner = () => {
           type="destination"
           label="Destination"
           hasPoint={hasDestination}
-          position={destinationPosition}
-          entityType={destinationEntityType}
-          isSelecting={
-            selectionMode === "destination"
+          position={
+            destinationPosition
           }
-          onSelect={selectDestination}
+          entityType={
+            destinationEntityType
+          }
+          isSelecting={
+            selectionMode ===
+            "destination"
+          }
+          onSelect={
+            selectDestination
+          }
         />
 
         <div className="journey-planner__actions">
@@ -189,7 +207,9 @@ export const JourneyPlanner = () => {
               "journey-button--primary"
             }
             onClick={calculateRoute}
-            disabled={!bothPointsSelected}
+            disabled={
+              !bothRoadsSelected
+            }
           >
             Calculate route
           </button>
@@ -218,14 +238,15 @@ const JourneyPoint = ({
   isSelecting,
   onSelect,
 }: JourneyPointProps) => {
-  const buttonClassName = isSelecting
-    ? "journey-button journey-button--active"
-    : "journey-button";
+  const buttonClassName =
+    isSelecting
+      ? "journey-button journey-button--active"
+      : "journey-button";
 
   let buttonText = "Select";
 
   if (isSelecting) {
-    buttonText = "Click on map…";
+    buttonText = "Click a road…";
   } else if (hasPoint) {
     buttonText = "Change";
   }
@@ -246,15 +267,17 @@ const JourneyPoint = ({
 
         <div className="journey-point__status">
           {hasPoint
-            ? position || "Point selected"
-            : "No point selected"}
+            ? position ||
+              "Road selected"
+            : "No road selected"}
         </div>
 
-        {hasPoint && entityType && (
-          <div className="journey-point__entity-type">
-            {entityType}
-          </div>
-        )}
+        {hasPoint &&
+          entityType && (
+            <div className="journey-point__entity-type">
+              {entityType}
+            </div>
+          )}
       </div>
 
       <button

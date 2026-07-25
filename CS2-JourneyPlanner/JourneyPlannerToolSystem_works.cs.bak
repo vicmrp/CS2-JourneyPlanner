@@ -1,0 +1,438 @@
+using Game.Common;
+using Game.Net;
+using Game.Prefabs;
+using Game.Tools;
+using Unity.Entities;
+using Unity.Jobs;
+using Unity.Mathematics;
+
+namespace CS2_JourneyPlanner
+{
+    public sealed partial class JourneyPlannerToolSystem
+        : ToolBaseSystem
+    {
+        private JourneyPlannerUISystem _uiSystem;
+
+        private bool _raycastInitializationLogged;
+
+        /*
+         * The road currently displayed with the blue hover outline.
+         */
+        private Entity _highlightedEntity;
+
+        public override string toolID =>
+            "JourneyPlannerTool";
+
+        protected override void OnCreate()
+        {
+            base.OnCreate();
+
+            _uiSystem =
+                World.GetOrCreateSystemManaged<
+                    JourneyPlannerUISystem
+                >();
+
+            _highlightedEntity = Entity.Null;
+
+            Mod.Log.Info(
+                "JourneyPlannerToolSystem.OnCreate."
+            );
+        }
+
+        protected override void OnStartRunning()
+        {
+            base.OnStartRunning();
+
+            applyAction.shouldBeEnabled = true;
+            cancelAction.shouldBeEnabled = true;
+
+            _highlightedEntity = Entity.Null;
+
+            Mod.Log.Info(
+                "Journey Planner tool activated."
+            );
+        }
+
+        protected override void OnStopRunning()
+        {
+            /*
+             * Remove the blue outline when the Journey Planner
+             * tool is closed or returns to the default tool.
+             */
+            ClearHoverHighlight();
+
+            applyAction.shouldBeEnabled = false;
+            cancelAction.shouldBeEnabled = false;
+
+            Mod.Log.Info(
+                "Journey Planner tool deactivated."
+            );
+
+            base.OnStopRunning();
+        }
+
+        public override PrefabBase GetPrefab()
+        {
+            return null;
+        }
+
+        public override bool TrySetPrefab(
+            PrefabBase prefab
+        )
+        {
+            return false;
+        }
+
+        public override void InitializeRaycast()
+        {
+            base.InitializeRaycast();
+
+            /*
+             * Only raycast against road network entities.
+             *
+             * Cars, buildings, props and decorative surfaces
+             * do not block selection of the road underneath.
+             */
+            m_ToolRaycastSystem.typeMask =
+                TypeMask.Net;
+
+            m_ToolRaycastSystem.netLayerMask =
+                Layer.Road;
+
+            if (_raycastInitializationLogged)
+            {
+                return;
+            }
+
+            _raycastInitializationLogged = true;
+
+            Mod.Log.Info(
+                "Journey Planner raycast initialized for roads only."
+            );
+        }
+
+        protected override JobHandle OnUpdate(
+            JobHandle inputDeps
+        )
+        {
+            /*
+             * Update hover highlighting every frame, not only
+             * when the mouse button is pressed.
+             */
+            UpdateHoverHighlight();
+
+            if (cancelAction.WasPressedThisFrame())
+            {
+                HandleCancel();
+
+                return inputDeps;
+            }
+
+            if (!applyAction.WasPressedThisFrame())
+            {
+                return inputDeps;
+            }
+
+            ProcessMapClick();
+
+            return inputDeps;
+        }
+
+        private void UpdateHoverHighlight()
+        {
+            bool hasResult = GetRaycastResult(
+                out Entity entity,
+                out Game.Common.RaycastHit hit
+            );
+
+            /*
+             * No road under the cursor:
+             * remove the previous outline.
+             */
+            if (!hasResult)
+            {
+                ClearHoverHighlight();
+                return;
+            }
+
+            if (!IsRoadEdge(entity))
+            {
+                ClearHoverHighlight();
+                return;
+            }
+
+            /*
+             * The same road is still hovered.
+             * Nothing needs to change.
+             */
+            if (entity == _highlightedEntity)
+            {
+                return;
+            }
+
+            /*
+             * Cursor moved to a different road.
+             */
+            ClearHoverHighlight();
+            SetHoverHighlight(entity);
+        }
+
+        private void SetHoverHighlight(Entity entity)
+        {
+            if (
+                entity == Entity.Null ||
+                !EntityManager.Exists(entity)
+            )
+            {
+                return;
+            }
+
+            if (
+                !EntityManager.HasComponent<
+                    Highlighted
+                >(entity)
+            )
+            {
+                EntityManager.AddComponent<
+                    Highlighted
+                >(entity);
+            }
+
+            _highlightedEntity = entity;
+        }
+
+        private void ClearHoverHighlight()
+        {
+            if (_highlightedEntity == Entity.Null)
+            {
+                return;
+            }
+
+            if (
+                EntityManager.Exists(_highlightedEntity) &&
+                EntityManager.HasComponent<
+                    Highlighted
+                >(_highlightedEntity)
+            )
+            {
+                EntityManager.RemoveComponent<
+                    Highlighted
+                >(_highlightedEntity);
+            }
+
+            _highlightedEntity = Entity.Null;
+        }
+
+        private void ProcessMapClick()
+        {
+            bool hasResult = GetRaycastResult(
+                out Entity entity,
+                out Game.Common.RaycastHit hit
+            );
+
+            Mod.Log.Info(
+                $"Apply action pressed. " +
+                $"HasRaycastResult={hasResult}"
+            );
+
+            if (!hasResult)
+            {
+                RejectPoint(
+                    "No road was found under the cursor."
+                );
+
+                return;
+            }
+
+            float3 position =
+                hit.m_HitPosition;
+
+            LogRoadDiagnostics(
+                entity,
+                position
+            );
+
+            if (
+                !TryValidateRoad(
+                    entity,
+                    position,
+                    out string rejectionReason
+                )
+            )
+            {
+                RejectPoint(rejectionReason);
+                return;
+            }
+
+            Mod.Log.Info(
+                $"Road selected. " +
+                $"Entity={entity}, " +
+                $"Position=({position.x:F1}, " +
+                $"{position.y:F1}, " +
+                $"{position.z:F1})"
+            );
+
+            _uiSystem.ConfirmRoadSelection(
+                entity,
+                position
+            );
+        }
+
+        private bool TryValidateRoad(
+            Entity entity,
+            float3 position,
+            out string rejectionReason
+        )
+        {
+            if (!math.all(math.isfinite(position)))
+            {
+                rejectionReason =
+                    "The selected point has invalid coordinates.";
+
+                return false;
+            }
+
+            if (
+                entity == Entity.Null ||
+                !EntityManager.Exists(entity)
+            )
+            {
+                rejectionReason =
+                    "No road was found under the cursor.";
+
+                return false;
+            }
+
+            if (!IsRoadEdge(entity))
+            {
+                rejectionReason =
+                    "The selected network is not a road.";
+
+                return false;
+            }
+
+            rejectionReason = string.Empty;
+
+            return true;
+        }
+
+        private bool IsRoadEdge(Entity entity)
+        {
+            if (
+                entity == Entity.Null ||
+                !EntityManager.Exists(entity)
+            )
+            {
+                return false;
+            }
+
+            return
+                EntityManager.HasComponent<
+                    Edge
+                >(entity) &&
+                EntityManager.HasComponent<
+                    Road
+                >(entity);
+        }
+
+        private void LogRoadDiagnostics(
+            Entity entity,
+            float3 position
+        )
+        {
+            if (
+                entity == Entity.Null ||
+                !EntityManager.Exists(entity)
+            )
+            {
+                Mod.Log.Info(
+                    $"Road diagnostics: " +
+                    $"Entity=Entity.Null, " +
+                    $"Position=({position.x:F1}, " +
+                    $"{position.y:F1}, " +
+                    $"{position.z:F1})"
+                );
+
+                return;
+            }
+
+            bool hasEdge =
+                EntityManager.HasComponent<
+                    Edge
+                >(entity);
+
+            bool hasNode =
+                EntityManager.HasComponent<
+                    Node
+                >(entity);
+
+            bool hasRoad =
+                EntityManager.HasComponent<
+                    Road
+                >(entity);
+
+            bool isHighlighted =
+                EntityManager.HasComponent<
+                    Highlighted
+                >(entity);
+
+            Mod.Log.Info(
+                $"Road diagnostics: " +
+                $"Entity={entity}, " +
+                $"Edge={hasEdge}, " +
+                $"Node={hasNode}, " +
+                $"Road={hasRoad}, " +
+                $"Highlighted={isHighlighted}, " +
+                $"Position=({position.x:F1}, " +
+                $"{position.y:F1}, " +
+                $"{position.z:F1})"
+            );
+        }
+
+        private void RejectPoint(
+            string reason
+        )
+        {
+            Mod.Log.Warn(
+                $"Road selection failed. " +
+                $"Reason={reason}"
+            );
+
+            _uiSystem.RejectSelection(reason);
+        }
+
+        private void HandleCancel()
+        {
+            Mod.Log.Info(
+                "Cancel action pressed."
+            );
+
+            ClearHoverHighlight();
+
+            _uiSystem.CancelSelection();
+
+            ReturnToDefaultTool();
+        }
+
+        public void ReturnToDefaultTool()
+        {
+            if (m_ToolSystem.activeTool != this)
+            {
+                return;
+            }
+
+            /*
+             * Remove immediately rather than waiting for
+             * OnStopRunning().
+             */
+            ClearHoverHighlight();
+
+            Mod.Log.Info(
+                "Returning to DefaultToolSystem."
+            );
+
+            m_ToolSystem.activeTool =
+                m_DefaultToolSystem;
+        }
+    }
+}

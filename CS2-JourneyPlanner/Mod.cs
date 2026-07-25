@@ -7,24 +7,31 @@ namespace CS2_JourneyPlanner
 {
     public sealed class Mod : IMod
     {
-        public const string Version = "0.1c";
+        public const string Version = "0.1d";
 
         public static readonly ILog Log = LogManager
-            .GetLogger($"{nameof(CS2_JourneyPlanner)}.{nameof(Mod)}")
+            .GetLogger(
+                $"{nameof(CS2_JourneyPlanner)}.{nameof(Mod)}"
+            )
             .SetShowsErrorsInUI(false);
 
         public void OnLoad(UpdateSystem updateSystem)
         {
-            Log.Info($"Journey Planner v{Version} loading.");
+            Log.Info(
+                $"Journey Planner v{Version} loading."
+            );
 
             if (
-                GameManager.instance.modManager.TryGetExecutableAsset(
-                    this,
-                    out var asset
-                )
+                GameManager.instance.modManager
+                    .TryGetExecutableAsset(
+                        this,
+                        out var asset
+                    )
             )
             {
-                Log.Info($"Current mod asset at {asset.path}");
+                Log.Info(
+                    $"Current mod asset at {asset.path}"
+                );
             }
 
             updateSystem.UpdateAt<JourneyPlannerUISystem>(
@@ -35,12 +42,16 @@ namespace CS2_JourneyPlanner
                 SystemUpdatePhase.ToolUpdate
             );
 
-            Log.Info("Journey Planner systems registered.");
+            Log.Info(
+                "Journey Planner systems registered."
+            );
         }
 
         public void OnDispose()
         {
-            Log.Info($"Journey Planner v{Version} disposed.");
+            Log.Info(
+                $"Journey Planner v{Version} disposed."
+            );
         }
     }
 }
