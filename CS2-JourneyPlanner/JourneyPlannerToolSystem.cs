@@ -1,11 +1,9 @@
 using System;
-using System.Linq;
-using System.Reflection;
 using Game.Common;
 using Game.Net;
 using Game.Prefabs;
 using Game.Tools;
-using Unity.Collections;
+using Game.UI;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -16,12 +14,13 @@ namespace CS2_JourneyPlanner
         : ToolBaseSystem
     {
         private JourneyPlannerUISystem _uiSystem;
+        private NameSystem _nameSystem;
 
         private bool _raycastInitializationLogged;
-        private bool _nameSystemMethodsLogged;
 
         /*
-         * Road currently shown with the blue hover outline.
+         * The road edge currently receiving the blue
+         * hover highlight.
          */
         private Entity _highlightedEntity;
 
@@ -37,13 +36,16 @@ namespace CS2_JourneyPlanner
                     JourneyPlannerUISystem
                 >();
 
+            _nameSystem =
+                World.GetOrCreateSystemManaged<
+                    NameSystem
+                >();
+
             _highlightedEntity = Entity.Null;
 
             Mod.Log.Info(
                 "JourneyPlannerToolSystem.OnCreate."
             );
-
-            LogNameSystemMethods();
         }
 
         protected override void OnStartRunning()
@@ -91,7 +93,7 @@ namespace CS2_JourneyPlanner
             base.InitializeRaycast();
 
             /*
-             * Restrict the raycast to road-network entities.
+             * Only road-network entities should be returned.
              */
             m_ToolRaycastSystem.typeMask =
                 TypeMask.Net;
@@ -107,7 +109,8 @@ namespace CS2_JourneyPlanner
             _raycastInitializationLogged = true;
 
             Mod.Log.Info(
-                "Journey Planner raycast initialized for roads only."
+                "Journey Planner raycast initialized " +
+                "for roads only."
             );
         }
 
@@ -124,12 +127,10 @@ namespace CS2_JourneyPlanner
                 return inputDeps;
             }
 
-            if (!applyAction.WasPressedThisFrame())
+            if (applyAction.WasPressedThisFrame())
             {
-                return inputDeps;
+                ProcessMapClick();
             }
-
-            ProcessMapClick();
 
             return inputDeps;
         }
@@ -212,7 +213,7 @@ namespace CS2_JourneyPlanner
         private void ProcessMapClick()
         {
             bool hasResult = GetRaycastResult(
-                out Entity entity,
+                out Entity roadEdge,
                 out Game.Common.RaycastHit hit
             );
 
@@ -233,14 +234,9 @@ namespace CS2_JourneyPlanner
             float3 position =
                 hit.m_HitPosition;
 
-            LogRoadDiagnostics(
-                entity,
-                position
-            );
-
             if (
                 !TryValidateRoad(
-                    entity,
+                    roadEdge,
                     position,
                     out string rejectionReason
                 )
@@ -250,70 +246,30 @@ namespace CS2_JourneyPlanner
                 return;
             }
 
-            /*
-             * Print all components on the selected road edge.
-             */
-            LogAllComponents(
-                entity,
-                "Selected road edge"
-            );
-
-            LogPossibleNamingComponents(
-                entity
-            );
-
-            /*
-             * Resolve:
-             *
-             * Road edge
-             * → Game.Net.Aggregated
-             * → aggregate road entity
-             */
             Entity aggregateEntity =
-                ResolveRoadAggregate(entity);
+                ResolveRoadAggregate(roadEdge);
 
-            if (aggregateEntity != Entity.Null)
-            {
-                Mod.Log.Info(
-                    $"Resolved road aggregate: " +
-                    $"RoadEdge={entity}, " +
-                    $"Aggregate={aggregateEntity}"
-                );
-
-                LogAllComponents(
-                    aggregateEntity,
-                    "Road aggregate"
-                );
-
-                LogPossibleNamingComponents(
+            string roadName =
+                ResolveRoadName(
+                    roadEdge,
                     aggregateEntity
                 );
-            }
-            else
-            {
-                Mod.Log.Warn(
-                    $"Could not resolve aggregate entity " +
-                    $"for road edge {entity}."
-                );
-            }
-
-            Mod.Log.Info(
-                $"Road-name diagnostic completed. " +
-                $"Edge={entity}, " +
-                $"Aggregate={aggregateEntity}"
-            );
 
             Mod.Log.Info(
                 $"Road selected. " +
-                $"Entity={entity}, " +
+                $"Edge={roadEdge}, " +
+                $"Aggregate={aggregateEntity}, " +
+                $"Name={roadName}, " +
                 $"Position=({position.x:F1}, " +
                 $"{position.y:F1}, " +
                 $"{position.z:F1})"
             );
 
             _uiSystem.ConfirmRoadSelection(
-                entity,
-                position
+                roadEdge,
+                aggregateEntity,
+                position,
+                roadName
             );
         }
 
@@ -345,7 +301,7 @@ namespace CS2_JourneyPlanner
             if (!IsRoadEdge(entity))
             {
                 rejectionReason =
-                    "The selected network is not a road.";
+                    "The selected network entity is not a road.";
 
                 return false;
             }
@@ -368,12 +324,8 @@ namespace CS2_JourneyPlanner
             }
 
             return
-                EntityManager.HasComponent<
-                    Edge
-                >(entity) &&
-                EntityManager.HasComponent<
-                    Road
-                >(entity);
+                EntityManager.HasComponent<Edge>(entity) &&
+                EntityManager.HasComponent<Road>(entity);
         }
 
         private Entity ResolveRoadAggregate(
@@ -385,11 +337,6 @@ namespace CS2_JourneyPlanner
                 !EntityManager.Exists(roadEdge)
             )
             {
-                Mod.Log.Warn(
-                    "Cannot resolve aggregate: " +
-                    "the road edge is invalid."
-                );
-
                 return Entity.Null;
             }
 
@@ -400,7 +347,7 @@ namespace CS2_JourneyPlanner
             )
             {
                 Mod.Log.Warn(
-                    $"Road edge {roadEdge} does not contain " +
+                    $"Road edge {roadEdge} does not have " +
                     "Game.Net.Aggregated."
                 );
 
@@ -415,20 +362,14 @@ namespace CS2_JourneyPlanner
             Entity aggregateEntity =
                 aggregated.m_Aggregate;
 
-            Mod.Log.Info(
-                $"Aggregated component: " +
-                $"RoadEdge={roadEdge}, " +
-                $"m_Aggregate={aggregateEntity}"
-            );
-
             if (
                 aggregateEntity == Entity.Null ||
                 !EntityManager.Exists(aggregateEntity)
             )
             {
                 Mod.Log.Warn(
-                    $"Aggregate entity {aggregateEntity} " +
-                    "is null or does not exist."
+                    $"Road aggregate {aggregateEntity} " +
+                    $"for edge {roadEdge} is invalid."
                 );
 
                 return Entity.Null;
@@ -437,371 +378,77 @@ namespace CS2_JourneyPlanner
             return aggregateEntity;
         }
 
-        private void LogRoadDiagnostics(
-            Entity entity,
-            float3 position
+        private string ResolveRoadName(
+            Entity roadEdge,
+            Entity aggregateEntity
         )
         {
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                Mod.Log.Info(
-                    $"Road diagnostics: " +
-                    $"Entity=Entity.Null, " +
-                    $"Position=({position.x:F1}, " +
-                    $"{position.y:F1}, " +
-                    $"{position.z:F1})"
-                );
-
-                return;
-            }
-
-            bool hasEdge =
-                EntityManager.HasComponent<
-                    Edge
-                >(entity);
-
-            bool hasNode =
-                EntityManager.HasComponent<
-                    Node
-                >(entity);
-
-            bool hasRoad =
-                EntityManager.HasComponent<
-                    Road
-                >(entity);
-
-            bool hasAggregated =
-                EntityManager.HasComponent<
-                    Aggregated
-                >(entity);
-
-            bool isHighlighted =
-                EntityManager.HasComponent<
-                    Highlighted
-                >(entity);
-
-            Mod.Log.Info(
-                $"Road diagnostics: " +
-                $"Entity={entity}, " +
-                $"Edge={hasEdge}, " +
-                $"Node={hasNode}, " +
-                $"Road={hasRoad}, " +
-                $"Aggregated={hasAggregated}, " +
-                $"Highlighted={isHighlighted}, " +
-                $"Position=({position.x:F1}, " +
-                $"{position.y:F1}, " +
-                $"{position.z:F1})"
-            );
-        }
-
-        private void LogAllComponents(
-            Entity entity,
-            string label
-        )
-        {
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                Mod.Log.Warn(
-                    $"{label}: entity is null " +
-                    "or no longer exists."
-                );
-
-                return;
-            }
-
-            using (
-                NativeArray<ComponentType> componentTypes =
-                    EntityManager.GetComponentTypes(
-                        entity,
-                        Allocator.Temp
-                    )
-            )
-            {
-                Mod.Log.Info(
-                    $"{label}: {entity} contains " +
-                    $"{componentTypes.Length} components."
-                );
-
-                for (
-                    int index = 0;
-                    index < componentTypes.Length;
-                    index++
-                )
-                {
-                    ComponentType componentType =
-                        componentTypes[index];
-
-                    Type managedType =
-                        componentType.GetManagedType();
-
-                    string typeName =
-                        managedType != null
-                            ? managedType.FullName
-                            : componentType.ToString();
-
-                    Mod.Log.Info(
-                        $"  Component[{index}]={typeName}"
-                    );
-                }
-            }
-        }
-
-        private void LogPossibleNamingComponents(
-            Entity entity
-        )
-        {
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                return;
-            }
-
-            using (
-                NativeArray<ComponentType> componentTypes =
-                    EntityManager.GetComponentTypes(
-                        entity,
-                        Allocator.Temp
-                    )
-            )
-            {
-                bool foundCandidate = false;
-
-                Mod.Log.Info(
-                    $"Searching {entity} for possible " +
-                    "road-name and aggregate components."
-                );
-
-                for (
-                    int index = 0;
-                    index < componentTypes.Length;
-                    index++
-                )
-                {
-                    ComponentType componentType =
-                        componentTypes[index];
-
-                    Type managedType =
-                        componentType.GetManagedType();
-
-                    string typeName =
-                        managedType != null
-                            ? managedType.FullName
-                            : componentType.ToString();
-
-                    if (
-                        ContainsIgnoreCase(
-                            typeName,
-                            "name"
-                        ) ||
-                        ContainsIgnoreCase(
-                            typeName,
-                            "localization"
-                        ) ||
-                        ContainsIgnoreCase(
-                            typeName,
-                            "aggregat"
-                        ) ||
-                        ContainsIgnoreCase(
-                            typeName,
-                            "owner"
-                        ) ||
-                        ContainsIgnoreCase(
-                            typeName,
-                            "label"
-                        )
-                    )
-                    {
-                        foundCandidate = true;
-
-                        Mod.Log.Info(
-                            $"  Possible road-name component: " +
-                            $"{typeName}"
-                        );
-                    }
-                }
-
-                if (!foundCandidate)
-                {
-                    Mod.Log.Warn(
-                        "No obvious Name, Localization, " +
-                        "Aggregate, Owner or Label component " +
-                        "was found on the entity."
-                    );
-                }
-            }
-        }
-
-        private void LogNameSystemMethods()
-        {
-            if (_nameSystemMethodsLogged)
-            {
-                return;
-            }
-
-            _nameSystemMethodsLogged = true;
+            /*
+             * The rendered road label belongs to the aggregate,
+             * not to the individual road edge.
+             */
+            Entity namingEntity =
+                aggregateEntity != Entity.Null
+                    ? aggregateEntity
+                    : roadEdge;
 
             try
             {
-                Type nameSystemType =
-                    typeof(Game.UI.NameSystem);
-
-                MethodInfo[] methods =
-                    nameSystemType.GetMethods(
-                        BindingFlags.Instance |
-                        BindingFlags.Static |
-                        BindingFlags.Public |
-                        BindingFlags.NonPublic
+                string roadName =
+                    _nameSystem.GetRenderedLabelName(
+                        namingEntity
                     );
 
-                Mod.Log.Info(
-                    $"Game.UI.NameSystem contains " +
-                    $"{methods.Length} methods."
-                );
-
-                MethodInfo[] nameMethods =
-                    methods
-                        .Where(method =>
-                            method.Name.IndexOf(
-                                "name",
-                                StringComparison.OrdinalIgnoreCase
-                            ) >= 0)
-                        .OrderBy(method => method.Name)
-                        .ThenBy(method =>
-                            method.GetParameters().Length)
-                        .ToArray();
-
-                Mod.Log.Info(
-                    $"Game.UI.NameSystem contains " +
-                    $"{nameMethods.Length} name-related methods."
-                );
-
-                foreach (MethodInfo method in nameMethods)
+                if (!string.IsNullOrWhiteSpace(roadName))
                 {
-                    ParameterInfo[] methodParameters =
-                        method.GetParameters();
-
-                    string parameters =
-                        string.Join(
-                            ", ",
-                            methodParameters.Select(
-                                parameter =>
-                                    FormatParameter(parameter)
-                            )
-                        );
-
                     Mod.Log.Info(
-                        $"NameSystem method: " +
-                        $"{GetReadableTypeName(method.ReturnType)} " +
-                        $"{method.Name}({parameters})"
+                        $"Resolved road name. " +
+                        $"Entity={namingEntity}, " +
+                        $"Name={roadName}"
                     );
+
+                    return roadName;
+                }
+
+                /*
+                 * GetRenderedLabelName should normally return the
+                 * generated or custom road name. This fallback
+                 * checks explicitly for a custom name.
+                 */
+                if (
+                    _nameSystem.TryGetCustomName(
+                        namingEntity,
+                        out string customName
+                    ) &&
+                    !string.IsNullOrWhiteSpace(customName)
+                )
+                {
+                    Mod.Log.Info(
+                        $"Resolved custom road name. " +
+                        $"Entity={namingEntity}, " +
+                        $"Name={customName}"
+                    );
+
+                    return customName;
                 }
             }
             catch (Exception exception)
             {
                 Mod.Log.Error(
-                    $"Failed to inspect Game.UI.NameSystem. " +
-                    $"{exception}"
+                    $"Failed to resolve road name. " +
+                    $"RoadEdge={roadEdge}, " +
+                    $"Aggregate={aggregateEntity}, " +
+                    $"Exception={exception}"
                 );
             }
-        }
 
-        private static string FormatParameter(
-            ParameterInfo parameter
-        )
-        {
-            string prefix = string.Empty;
+            Mod.Log.Warn(
+                $"No road name was resolved. " +
+                $"RoadEdge={roadEdge}, " +
+                $"Aggregate={aggregateEntity}"
+            );
 
-            if (parameter.IsOut)
-            {
-                prefix = "out ";
-            }
-            else if (
-                parameter.ParameterType.IsByRef
-            )
-            {
-                prefix = "ref ";
-            }
-
-            Type parameterType =
-                parameter.ParameterType;
-
-            if (parameterType.IsByRef)
-            {
-                parameterType =
-                    parameterType.GetElementType();
-            }
-
-            return
-                $"{prefix}" +
-                $"{GetReadableTypeName(parameterType)} " +
-                $"{parameter.Name}";
-        }
-
-        private static string GetReadableTypeName(
-            Type type
-        )
-        {
-            if (type == null)
-            {
-                return "unknown";
-            }
-
-            if (!type.IsGenericType)
-            {
-                return type.FullName ?? type.Name;
-            }
-
-            string genericName =
-                type.GetGenericTypeDefinition().FullName;
-
-            int backtickIndex =
-                genericName.IndexOf('`');
-
-            if (backtickIndex >= 0)
-            {
-                genericName =
-                    genericName.Substring(
-                        0,
-                        backtickIndex
-                    );
-            }
-
-            string arguments =
-                string.Join(
-                    ", ",
-                    type.GetGenericArguments()
-                        .Select(GetReadableTypeName)
-                );
-
-            return
-                $"{genericName}<{arguments}>";
-        }
-
-        private static bool ContainsIgnoreCase(
-            string source,
-            string searchValue
-        )
-        {
-            if (
-                string.IsNullOrEmpty(source) ||
-                string.IsNullOrEmpty(searchValue)
-            )
-            {
-                return false;
-            }
-
-            return source.IndexOf(
-                searchValue,
-                StringComparison.OrdinalIgnoreCase
-            ) >= 0;
+            return "Unnamed road";
         }
 
         private void RejectPoint(
@@ -809,8 +456,7 @@ namespace CS2_JourneyPlanner
         )
         {
             Mod.Log.Warn(
-                $"Road selection failed. " +
-                $"Reason={reason}"
+                $"Road selection failed. Reason={reason}"
             );
 
             _uiSystem.RejectSelection(reason);

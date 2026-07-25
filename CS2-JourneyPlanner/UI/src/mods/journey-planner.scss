@@ -1,117 +1,227 @@
 .journey-planner {
-  position: absolute;
-  top: 120rem;
-  left: 20rem;
-  width: 420rem;
+  position: fixed;
+  top: 24rem;
+  left: 24rem;
+  z-index: 10000;
 
-  border-radius: 8rem;
-  background: rgba(25, 31, 38, 0.96);
+  pointer-events: auto;
+
+  width: 420rem;
+  max-width: calc(100vw - 48rem);
+  max-height: calc(100vh - 48rem);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  margin: 0;
+  transform: none;
+
+  border-radius: 10rem;
+  background: rgba(20, 28, 36, 0.94);
   color: white;
 
-  overflow: hidden;
-  pointer-events: auto;
+  box-shadow:
+    0 8rem 24rem rgba(0, 0, 0, 0.35);
 }
 
 .journey-planner__header {
-  padding: 14rem 16rem;
-  font-size: 18rem;
-  font-weight: 600;
+  padding: 18rem;
 
-  background: rgba(46, 57, 68, 0.95);
+  border-bottom:
+    1px solid rgba(255, 255, 255, 0.1);
+
+  background:
+    rgba(48, 61, 74, 0.94);
+}
+
+.journey-planner__header h2 {
+  margin: 0;
+
+  font-size: 24rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.journey-planner__version {
+  margin-top: 6rem;
+
+  font-size: 13rem;
+
+  color:
+    rgba(255, 255, 255, 0.68);
 }
 
 .journey-planner__body {
   display: flex;
   flex-direction: column;
-  gap: 12rem;
+  gap: 14rem;
 
   padding: 16rem;
+
+  overflow-y: auto;
 }
 
-.journey-point {
+.journey-planner__selection {
+  display: flex;
+  flex-direction: column;
+  gap: 10rem;
+
+  padding: 13rem;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.12);
+
+  border-radius: 8rem;
+
+  background:
+    rgba(255, 255, 255, 0.045);
+}
+
+.journey-planner__selection-header {
   display: flex;
   align-items: center;
-  gap: 12rem;
-
-  padding: 12rem;
-  border-radius: 6rem;
-  background: rgba(255, 255, 255, 0.07);
+  justify-content: space-between;
+  gap: 10rem;
 }
 
-.journey-point__marker {
-  width: 14rem;
-  height: 14rem;
-  flex-shrink: 0;
+.journey-planner__selection-header h3 {
+  margin: 0;
 
-  border: 3rem solid white;
-  border-radius: 50%;
+  font-size: 16rem;
+  font-weight: 700;
 }
 
-.journey-point__marker--start {
-  background: #3fb950;
-}
-
-.journey-point__marker--destination {
-  background: #f85149;
-}
-
-.journey-point__content {
-  flex: 1;
-}
-
-.journey-point__label {
-  font-size: 15rem;
-  font-weight: 600;
-}
-
-.journey-point__status {
-  margin-top: 3rem;
-  font-size: 12rem;
-  opacity: 0.7;
-}
-
-.journey-planner__actions {
+.journey-planner__selection-content {
   display: flex;
-  justify-content: flex-end;
-  gap: 8rem;
+  flex-direction: column;
+  gap: 7rem;
 }
 
-.journey-button {
-  padding: 8rem 12rem;
+.journey-planner__road-name {
+  font-size: 17rem;
+  font-weight: 700;
 
-  border: none;
-  border-radius: 4rem;
-
-  background: rgba(255, 255, 255, 0.12);
   color: white;
+
+  overflow-wrap: anywhere;
+}
+
+.journey-planner__detail {
+  font-size: 12rem;
+  line-height: 1.35;
+
+  color:
+    rgba(255, 255, 255, 0.68);
+
+  overflow-wrap: anywhere;
+}
+
+.journey-planner__status {
+  padding: 11rem 12rem;
+
+  border-radius: 7rem;
+
+  background:
+    rgba(0, 0, 0, 0.2);
+
+  font-size: 13rem;
+  line-height: 1.4;
+
+  color:
+    rgba(255, 255, 255, 0.82);
+}
+
+.journey-planner__button,
+.journey-planner__small-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.2);
+
+  border-radius: 6rem;
+
+  background:
+    rgba(70, 85, 100, 0.9);
+
+  color: white;
+
+  font-weight: 600;
+  text-align: center;
+
   cursor: pointer;
+
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
 }
 
-.journey-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+.journey-planner__button {
+  width: 100%;
+  min-height: 38rem;
+
+  padding: 8rem 14rem;
+
+  font-size: 14rem;
 }
 
-.journey-button:disabled {
+.journey-planner__small-button {
+  width: auto;
+  min-width: 62rem;
+  min-height: 30rem;
+
+  padding: 5rem 10rem;
+
+  font-size: 12rem;
+}
+
+.journey-planner__button:hover,
+.journey-planner__small-button:hover {
+  border-color:
+    rgba(255, 255, 255, 0.34);
+
+  background:
+    rgba(90, 110, 130, 0.95);
+}
+
+.journey-planner__button--primary {
+  background:
+    rgba(40, 105, 165, 0.95);
+}
+
+.journey-planner__button--primary:hover {
+  background:
+    rgba(50, 125, 190, 1);
+}
+
+.journey-planner__button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.journey-button--active {
-  background: rgba(72, 145, 220, 0.8);
-}
+.journey-planner__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8rem;
 
-.journey-button--primary {
-  background: rgba(48, 130, 210, 0.9);
-}
-
-.journey-point__entity-type {
   margin-top: 2rem;
-  font-size: 11rem;
-  opacity: 0.7;
 }
 
-.journey-point__entity-type {
-  margin-top: 2rem;
-  font-size: 11rem;
-  opacity: 0.7;
+.journey-planner__actions .journey-planner__button {
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .journey-planner {
+    width: calc(100vw - 24rem);
+  }
+
+  .journey-planner__actions {
+    grid-template-columns: 1fr;
+  }
 }

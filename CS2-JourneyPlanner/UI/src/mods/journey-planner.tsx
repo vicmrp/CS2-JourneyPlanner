@@ -7,75 +7,171 @@ import {
 
 import "./journey-planner.scss";
 
-type SelectionMode =
-  | "none"
-  | "start"
-  | "destination";
+const bindingGroup = "JourneyPlanner";
 
-type JourneyPointType =
-  | "start"
-  | "destination";
+const selectionMode$ = bindValue<string>(
+  bindingGroup,
+  "SelectionMode",
+  "None",
+);
 
-const bindingGroup =
-  "JourneyPlanner";
+const hasStart$ = bindValue<boolean>(
+  bindingGroup,
+  "HasStart",
+  false,
+);
 
-const selectionMode$ =
-  bindValue<SelectionMode>(
-    bindingGroup,
-    "SelectionMode",
-    "none"
+const hasDestination$ = bindValue<boolean>(
+  bindingGroup,
+  "HasDestination",
+  false,
+);
+
+const status$ = bindValue<string>(
+  bindingGroup,
+  "Status",
+  "Select a starting point.",
+);
+
+const startPosition$ = bindValue<string>(
+  bindingGroup,
+  "StartPosition",
+  "",
+);
+
+const destinationPosition$ = bindValue<string>(
+  bindingGroup,
+  "DestinationPosition",
+  "",
+);
+
+const startEntityType$ = bindValue<string>(
+  bindingGroup,
+  "StartEntityType",
+  "",
+);
+
+const destinationEntityType$ = bindValue<string>(
+  bindingGroup,
+  "DestinationEntityType",
+  "",
+);
+
+const startRoadName$ = bindValue<string>(
+  bindingGroup,
+  "StartRoadName",
+  "",
+);
+
+const destinationRoadName$ = bindValue<string>(
+  bindingGroup,
+  "DestinationRoadName",
+  "",
+);
+
+function selectStart(): void {
+  trigger(bindingGroup, "SelectStart");
+}
+
+function selectDestination(): void {
+  trigger(bindingGroup, "SelectDestination");
+}
+
+function clearStart(): void {
+  trigger(bindingGroup, "ClearStart");
+}
+
+function clearDestination(): void {
+  trigger(bindingGroup, "ClearDestination");
+}
+
+function clearAll(): void {
+  trigger(bindingGroup, "ClearAll");
+}
+
+function calculateRoute(): void {
+  trigger(bindingGroup, "CalculateRoute");
+}
+
+interface SelectionCardProps {
+  title: string;
+  hasSelection: boolean;
+  roadName: string;
+  position: string;
+  entity: string;
+  selecting: boolean;
+  onSelect: () => void;
+  onClear: () => void;
+}
+
+function SelectionCard({
+  title,
+  hasSelection,
+  roadName,
+  position,
+  entity,
+  selecting,
+  onSelect,
+  onClear,
+}: SelectionCardProps): JSX.Element {
+  return (
+    <section className="journey-planner__selection">
+      <div className="journey-planner__selection-header">
+        <h3>{title}</h3>
+
+        {hasSelection && (
+          <button
+            className="journey-planner__small-button"
+            type="button"
+            onClick={onClear}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {hasSelection ? (
+        <div className="journey-planner__selection-content">
+          <div className="journey-planner__road-name">
+            {roadName || "Unnamed road"}
+          </div>
+
+          {position && (
+            <div className="journey-planner__detail">
+              {position}
+            </div>
+          )}
+
+          {entity && (
+            <div className="journey-planner__detail">
+              {entity}
+            </div>
+          )}
+
+          <button
+            className="journey-planner__button"
+            type="button"
+            onClick={onSelect}
+          >
+            {selecting ? "Selecting…" : "Change"}
+          </button>
+        </div>
+      ) : (
+        <button
+          className="journey-planner__button"
+          type="button"
+          onClick={onSelect}
+        >
+          {selecting
+            ? "Click a road…"
+            : `Select ${title}`}
+        </button>
+      )}
+    </section>
   );
+}
 
-const hasStart$ =
-  bindValue<boolean>(
-    bindingGroup,
-    "HasStart",
-    false
-  );
-
-const hasDestination$ =
-  bindValue<boolean>(
-    bindingGroup,
-    "HasDestination",
-    false
-  );
-
-const status$ =
-  bindValue<string>(
-    bindingGroup,
-    "Status",
-    "Select a starting road"
-  );
-
-const startPosition$ =
-  bindValue<string>(
-    bindingGroup,
-    "StartPosition",
-    ""
-  );
-
-const destinationPosition$ =
-  bindValue<string>(
-    bindingGroup,
-    "DestinationPosition",
-    ""
-  );
-
-const startEntityType$ =
-  bindValue<string>(
-    bindingGroup,
-    "StartEntityType",
-    ""
-  );
-
-const destinationEntityType$ =
-  bindValue<string>(
-    bindingGroup,
-    "DestinationEntityType",
-    ""
-  );
-
-export const JourneyPlanner = () => {
+export const JourneyPlanner = (): JSX.Element => {
   const selectionMode =
     useValue(selectionMode$);
 
@@ -98,120 +194,81 @@ export const JourneyPlanner = () => {
     useValue(startEntityType$);
 
   const destinationEntityType =
-    useValue(
-      destinationEntityType$
-    );
+    useValue(destinationEntityType$);
 
-  const selectStart = () => {
-    console.log(
-      "[JourneyPlanner] SelectStart"
-    );
+  const startRoadName =
+    useValue(startRoadName$);
 
-    trigger(
-      bindingGroup,
-      "SelectStart"
-    );
-  };
+  const destinationRoadName =
+    useValue(destinationRoadName$);
 
-  const selectDestination = () => {
-    console.log(
-      "[JourneyPlanner] SelectDestination"
-    );
+  const selectingStart =
+    selectionMode === "Start";
 
-    trigger(
-      bindingGroup,
-      "SelectDestination"
-    );
-  };
+  const selectingDestination =
+    selectionMode === "Destination";
 
-  const clearRoute = () => {
-    console.log(
-      "[JourneyPlanner] ClearRoute"
-    );
-
-    trigger(
-      bindingGroup,
-      "ClearRoute"
-    );
-  };
-
-  const calculateRoute = () => {
-    console.log(
-      "[JourneyPlanner] CalculateRoute"
-    );
-
-    trigger(
-      bindingGroup,
-      "CalculateRoute"
-    );
-  };
-
-  const bothRoadsSelected =
+  const canCalculate =
     hasStart && hasDestination;
 
   return (
     <div className="journey-planner">
-      <div className="journey-planner__header">
-        Journey Planner
-      </div>
+      <header className="journey-planner__header">
+        <div>
+          <h2>Journey Planner</h2>
+
+          <div className="journey-planner__version">
+            v0.1e · Road Names
+          </div>
+        </div>
+      </header>
 
       <div className="journey-planner__body">
+        <SelectionCard
+          title="Start"
+          hasSelection={hasStart}
+          roadName={startRoadName}
+          position={startPosition}
+          entity={startEntityType}
+          selecting={selectingStart}
+          onSelect={selectStart}
+          onClear={clearStart}
+        />
+
+        <SelectionCard
+          title="Destination"
+          hasSelection={hasDestination}
+          roadName={destinationRoadName}
+          position={destinationPosition}
+          entity={destinationEntityType}
+          selecting={selectingDestination}
+          onSelect={selectDestination}
+          onClear={clearDestination}
+        />
+
         <div className="journey-planner__status">
           {status}
         </div>
 
-        <JourneyPoint
-          type="start"
-          label="Start"
-          hasPoint={hasStart}
-          position={startPosition}
-          entityType={startEntityType}
-          isSelecting={
-            selectionMode === "start"
-          }
-          onSelect={selectStart}
-        />
-
-        <JourneyPoint
-          type="destination"
-          label="Destination"
-          hasPoint={hasDestination}
-          position={
-            destinationPosition
-          }
-          entityType={
-            destinationEntityType
-          }
-          isSelecting={
-            selectionMode ===
-            "destination"
-          }
-          onSelect={
-            selectDestination
-          }
-        />
-
         <div className="journey-planner__actions">
           <button
+            className={
+              "journey-planner__button " +
+              "journey-planner__button--primary"
+            }
             type="button"
-            className="journey-button"
-            onClick={clearRoute}
+            disabled={!canCalculate}
+            onClick={calculateRoute}
           >
-            Clear
+            Calculate Route
           </button>
 
           <button
+            className="journey-planner__button"
             type="button"
-            className={
-              "journey-button " +
-              "journey-button--primary"
-            }
-            onClick={calculateRoute}
-            disabled={
-              !bothRoadsSelected
-            }
+            onClick={clearAll}
           >
-            Calculate route
+            Clear All
           </button>
         </div>
       </div>
@@ -219,74 +276,4 @@ export const JourneyPlanner = () => {
   );
 };
 
-interface JourneyPointProps {
-  type: JourneyPointType;
-  label: string;
-  hasPoint: boolean;
-  position: string;
-  entityType: string;
-  isSelecting: boolean;
-  onSelect: () => void;
-}
-
-const JourneyPoint = ({
-  type,
-  label,
-  hasPoint,
-  position,
-  entityType,
-  isSelecting,
-  onSelect,
-}: JourneyPointProps) => {
-  const buttonClassName =
-    isSelecting
-      ? "journey-button journey-button--active"
-      : "journey-button";
-
-  let buttonText = "Select";
-
-  if (isSelecting) {
-    buttonText = "Click a road…";
-  } else if (hasPoint) {
-    buttonText = "Change";
-  }
-
-  return (
-    <div className="journey-point">
-      <div
-        className={
-          "journey-point__marker " +
-          `journey-point__marker--${type}`
-        }
-      />
-
-      <div className="journey-point__content">
-        <div className="journey-point__label">
-          {label}
-        </div>
-
-        <div className="journey-point__status">
-          {hasPoint
-            ? position ||
-              "Road selected"
-            : "No road selected"}
-        </div>
-
-        {hasPoint &&
-          entityType && (
-            <div className="journey-point__entity-type">
-              {entityType}
-            </div>
-          )}
-      </div>
-
-      <button
-        type="button"
-        className={buttonClassName}
-        onClick={onSelect}
-      >
-        {buttonText}
-      </button>
-    </div>
-  );
-};
+export default JourneyPlanner;

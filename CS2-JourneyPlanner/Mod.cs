@@ -1,44 +1,38 @@
 ﻿using Colossal.Logging;
 using Game;
 using Game.Modding;
-using Game.SceneFlow;
 
 namespace CS2_JourneyPlanner
 {
     public sealed class Mod : IMod
     {
-        public const string Version = "0.1d";
+        public const string Version = "0.1e";
+        public const string VersionName = "Road Names";
 
         public static readonly ILog Log = LogManager
-            .GetLogger(
-                $"{nameof(CS2_JourneyPlanner)}.{nameof(Mod)}"
-            )
-            .SetShowsErrorsInUI(false);
+            .GetLogger(nameof(CS2_JourneyPlanner))
+            .SetShowsErrorsInUI(true);
 
         public void OnLoad(UpdateSystem updateSystem)
         {
             Log.Info(
-                $"Journey Planner v{Version} loading."
+                $"Journey Planner v{Version} " +
+                $"({VersionName}) loading."
             );
 
-            if (
-                GameManager.instance.modManager
-                    .TryGetExecutableAsset(
-                        this,
-                        out var asset
-                    )
-            )
-            {
-                Log.Info(
-                    $"Current mod asset at {asset.path}"
-                );
-            }
+            Log.Info(
+                "Journey Planner systems are being registered."
+            );
 
-            updateSystem.UpdateAt<JourneyPlannerUISystem>(
+            updateSystem.UpdateAt<
+                JourneyPlannerUISystem
+            >(
                 SystemUpdatePhase.UIUpdate
             );
 
-            updateSystem.UpdateAt<JourneyPlannerToolSystem>(
+            updateSystem.UpdateAt<
+                JourneyPlannerToolSystem
+            >(
                 SystemUpdatePhase.ToolUpdate
             );
 
