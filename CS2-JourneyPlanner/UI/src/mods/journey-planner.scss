@@ -1,31 +1,110 @@
+/*
+ * Floating launcher
+ */
+
+.journey-planner-launcher {
+  position: fixed;
+  top: 78rem;
+  left: 18rem;
+  z-index: 10001;
+
+  width: 46rem;
+  height: 46rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  pointer-events: auto !important;
+  cursor: pointer;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.28);
+
+  border-radius: 8rem;
+
+  background:
+    rgba(43, 97, 145, 0.96);
+
+  color: white;
+
+  box-shadow:
+    0 4rem 14rem rgba(0, 0, 0, 0.35);
+
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+
+.journey-planner-launcher:hover {
+  background:
+    rgba(54, 120, 177, 1);
+
+  transform: translateY(-1rem);
+}
+
+.journey-planner-launcher__icon {
+  font-size: 14rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+
+/*
+ * Main panel
+ */
+
 .journey-planner {
   position: fixed;
-  top: 24rem;
-  left: 24rem;
+  top: 78rem;
+  left: 76rem;
   z-index: 10000;
 
-  pointer-events: auto;
+  pointer-events: auto !important;
 
   width: 420rem;
-  max-width: calc(100vw - 48rem);
-  max-height: calc(100vh - 48rem);
+  max-width: calc(100vw - 100rem);
+  max-height: calc(100vh - 120rem);
 
   display: flex;
   flex-direction: column;
+
   overflow: hidden;
 
   margin: 0;
   transform: none;
 
   border-radius: 10rem;
-  background: rgba(20, 28, 36, 0.94);
+
+  background:
+    rgba(20, 28, 36, 0.94);
+
   color: white;
 
   box-shadow:
     0 8rem 24rem rgba(0, 0, 0, 0.35);
 }
 
+.journey-planner,
+.journey-planner *,
+.journey-planner-launcher,
+.journey-planner-launcher * {
+  pointer-events: auto !important;
+}
+
+
+/*
+ * Header
+ */
+
 .journey-planner__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12rem;
+
   padding: 18rem;
 
   border-bottom:
@@ -33,6 +112,10 @@
 
   background:
     rgba(48, 61, 74, 0.94);
+}
+
+.journey-planner__title-area {
+  min-width: 0;
 }
 
 .journey-planner__header h2 {
@@ -51,6 +134,46 @@
   color:
     rgba(255, 255, 255, 0.68);
 }
+
+.journey-planner__close-button {
+  flex: 0 0 auto;
+
+  width: 32rem;
+  height: 32rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  pointer-events: auto !important;
+  cursor: pointer;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.18);
+
+  border-radius: 6rem;
+
+  background:
+    rgba(0, 0, 0, 0.18);
+
+  color: white;
+
+  font-size: 24rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.journey-planner__close-button:hover {
+  background:
+    rgba(160, 55, 55, 0.86);
+}
+
+
+/*
+ * Body and selection cards
+ */
 
 .journey-planner__body {
   display: flex;
@@ -132,6 +255,11 @@
     rgba(255, 255, 255, 0.82);
 }
 
+
+/*
+ * Buttons
+ */
+
 .journey-planner__button,
 .journey-planner__small-button {
   display: inline-flex;
@@ -139,6 +267,9 @@
   justify-content: center;
 
   box-sizing: border-box;
+
+  pointer-events: auto !important;
+  cursor: pointer;
 
   border:
     1px solid rgba(255, 255, 255, 0.2);
@@ -152,8 +283,6 @@
 
   font-weight: 600;
   text-align: center;
-
-  cursor: pointer;
 
   transition:
     background-color 120ms ease,
@@ -214,14 +343,4 @@
 
 .journey-planner__actions .journey-planner__button {
   width: 100%;
-}
-
-@media (max-width: 520px) {
-  .journey-planner {
-    width: calc(100vw - 24rem);
-  }
-
-  .journey-planner__actions {
-    grid-template-columns: 1fr;
-  }
 }

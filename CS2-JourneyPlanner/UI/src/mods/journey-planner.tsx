@@ -9,6 +9,12 @@ import "./journey-planner.scss";
 
 const bindingGroup = "JourneyPlanner";
 
+const windowVisible$ = bindValue<boolean>(
+  bindingGroup,
+  "WindowVisible",
+  false,
+);
+
 const selectionMode$ = bindValue<string>(
   bindingGroup,
   "SelectionMode",
@@ -68,6 +74,14 @@ const destinationRoadName$ = bindValue<string>(
   "DestinationRoadName",
   "",
 );
+
+function openWindow(): void {
+  trigger(bindingGroup, "OpenWindow");
+}
+
+function closeWindow(): void {
+  trigger(bindingGroup, "CloseWindow");
+}
 
 function selectStart(): void {
   trigger(bindingGroup, "SelectStart");
@@ -171,7 +185,26 @@ function SelectionCard({
   );
 }
 
+function LauncherButton(): JSX.Element {
+  return (
+    <button
+      className="journey-planner-launcher"
+      type="button"
+      title="Open Journey Planner"
+      aria-label="Open Journey Planner"
+      onClick={openWindow}
+    >
+      <span className="journey-planner-launcher__icon">
+        JP
+      </span>
+    </button>
+  );
+}
+
 export const JourneyPlanner = (): JSX.Element => {
+  const windowVisible =
+    useValue(windowVisible$);
+
   const selectionMode =
     useValue(selectionMode$);
 
@@ -211,68 +244,90 @@ export const JourneyPlanner = (): JSX.Element => {
   const canCalculate =
     hasStart && hasDestination;
 
-  return (
-    <div className="journey-planner">
-      <header className="journey-planner__header">
-        <div>
-          <h2>Journey Planner</h2>
+  /*
+   * Keep the React component mounted so the launcher
+   * remains available while the panel is closed.
+   */
+  if (!windowVisible) {
+    return <LauncherButton />;
+  }
 
-          <div className="journey-planner__version">
-            v0.1e · Road Names
+  return (
+    <>
+      <LauncherButton />
+
+      <div className="journey-planner">
+        <header className="journey-planner__header">
+          <div className="journey-planner__title-area">
+            <h2>Journey Planner</h2>
+
+            <div className="journey-planner__version">
+              v0.2a · Window Toggle
+            </div>
+          </div>
+
+          <button
+            className="journey-planner__close-button"
+            type="button"
+            title="Close Journey Planner"
+            aria-label="Close Journey Planner"
+            onClick={closeWindow}
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="journey-planner__body">
+          <SelectionCard
+            title="Start"
+            hasSelection={hasStart}
+            roadName={startRoadName}
+            position={startPosition}
+            entity={startEntityType}
+            selecting={selectingStart}
+            onSelect={selectStart}
+            onClear={clearStart}
+          />
+
+          <SelectionCard
+            title="Destination"
+            hasSelection={hasDestination}
+            roadName={destinationRoadName}
+            position={destinationPosition}
+            entity={destinationEntityType}
+            selecting={selectingDestination}
+            onSelect={selectDestination}
+            onClear={clearDestination}
+          />
+
+          <div className="journey-planner__status">
+            {status}
+          </div>
+
+          <div className="journey-planner__actions">
+            <button
+              className={
+                "journey-planner__button " +
+                "journey-planner__button--primary"
+              }
+              type="button"
+              disabled={!canCalculate}
+              onClick={calculateRoute}
+            >
+              Calculate Route
+            </button>
+
+            <button
+              className="journey-planner__button"
+              type="button"
+              onClick={clearAll}
+            >
+              Clear All
+            </button>
           </div>
         </div>
-      </header>
-
-      <div className="journey-planner__body">
-        <SelectionCard
-          title="Start"
-          hasSelection={hasStart}
-          roadName={startRoadName}
-          position={startPosition}
-          entity={startEntityType}
-          selecting={selectingStart}
-          onSelect={selectStart}
-          onClear={clearStart}
-        />
-
-        <SelectionCard
-          title="Destination"
-          hasSelection={hasDestination}
-          roadName={destinationRoadName}
-          position={destinationPosition}
-          entity={destinationEntityType}
-          selecting={selectingDestination}
-          onSelect={selectDestination}
-          onClear={clearDestination}
-        />
-
-        <div className="journey-planner__status">
-          {status}
-        </div>
-
-        <div className="journey-planner__actions">
-          <button
-            className={
-              "journey-planner__button " +
-              "journey-planner__button--primary"
-            }
-            type="button"
-            disabled={!canCalculate}
-            onClick={calculateRoute}
-          >
-            Calculate Route
-          </button>
-
-          <button
-            className="journey-planner__button"
-            type="button"
-            onClick={clearAll}
-          >
-            Clear All
-          </button>
-        </div>
       </div>
-    </div>
+    </>
   );
 };
 

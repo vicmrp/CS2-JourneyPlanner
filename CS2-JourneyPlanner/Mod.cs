@@ -6,8 +6,8 @@ namespace CS2_JourneyPlanner
 {
     public sealed class Mod : IMod
     {
-        public const string Version = "0.1e";
-        public const string VersionName = "Road Names";
+        public const string Version = "0.2a";
+        public const string VersionName = "Window Toggle";
 
         public static readonly ILog Log = LogManager
             .GetLogger(nameof(CS2_JourneyPlanner))
@@ -49,3 +49,4 @@ namespace CS2_JourneyPlanner
         }
     }
 }
+

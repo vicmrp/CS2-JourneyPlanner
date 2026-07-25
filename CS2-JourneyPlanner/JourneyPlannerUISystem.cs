@@ -6,42 +6,74 @@ using Unity.Mathematics;
 
 namespace CS2_JourneyPlanner
 {
-    public sealed partial class JourneyPlannerUISystem : UISystemBase
+    public sealed partial class JourneyPlannerUISystem
+        : UISystemBase
     {
-        private const string BindingGroup = "JourneyPlanner";
+        private const string BindingGroup =
+            "JourneyPlanner";
 
         private JourneyPlannerToolSystem _toolSystem;
         private ToolSystem _gameToolSystem;
 
-        private ValueBinding<string> _selectionModeBinding;
-        private ValueBinding<bool> _hasStartBinding;
-        private ValueBinding<bool> _hasDestinationBinding;
-        private ValueBinding<string> _statusBinding;
+        private bool _windowVisible;
 
-        private ValueBinding<string> _startPositionBinding;
-        private ValueBinding<string> _destinationPositionBinding;
+        private ValueBinding<bool>
+            _windowVisibleBinding;
 
-        private ValueBinding<string> _startEntityTypeBinding;
-        private ValueBinding<string> _destinationEntityTypeBinding;
+        private ValueBinding<string>
+            _selectionModeBinding;
 
-        private ValueBinding<string> _startRoadNameBinding;
-        private ValueBinding<string> _destinationRoadNameBinding;
+        private ValueBinding<bool>
+            _hasStartBinding;
+
+        private ValueBinding<bool>
+            _hasDestinationBinding;
+
+        private ValueBinding<string>
+            _statusBinding;
+
+        private ValueBinding<string>
+            _startPositionBinding;
+
+        private ValueBinding<string>
+            _destinationPositionBinding;
+
+        private ValueBinding<string>
+            _startEntityTypeBinding;
+
+        private ValueBinding<string>
+            _destinationEntityTypeBinding;
+
+        private ValueBinding<string>
+            _startRoadNameBinding;
+
+        private ValueBinding<string>
+            _destinationRoadNameBinding;
 
         public Entity StartOwner { get; private set; }
+
         public Entity DestinationOwner { get; private set; }
 
         public Entity StartAggregate { get; private set; }
+
         public Entity DestinationAggregate { get; private set; }
 
         public float3 StartPosition { get; private set; }
+
         public float3 DestinationPosition { get; private set; }
 
         public string StartRoadName { get; private set; }
+
         public string DestinationRoadName { get; private set; }
 
-        public SelectionMode CurrentSelectionMode { get; private set; }
+        public SelectionMode CurrentSelectionMode
+        {
+            get;
+            private set;
+        }
 
-        public bool HasStart => StartOwner != Entity.Null;
+        public bool HasStart =>
+            StartOwner != Entity.Null;
 
         public bool HasDestination =>
             DestinationOwner != Entity.Null;
@@ -64,6 +96,12 @@ namespace CS2_JourneyPlanner
                     ToolSystem
                 >();
 
+            /*
+             * The panel starts closed.
+             * The launcher button remains visible.
+             */
+            _windowVisible = false;
+
             StartOwner = Entity.Null;
             DestinationOwner = Entity.Null;
 
@@ -84,6 +122,13 @@ namespace CS2_JourneyPlanner
 
         private void CreateBindings()
         {
+            _windowVisibleBinding =
+                new ValueBinding<bool>(
+                    BindingGroup,
+                    "WindowVisible",
+                    _windowVisible
+                );
+
             _selectionModeBinding =
                 new ValueBinding<string>(
                     BindingGroup,
@@ -154,6 +199,8 @@ namespace CS2_JourneyPlanner
                     string.Empty
                 );
 
+            AddBinding(_windowVisibleBinding);
+
             AddBinding(_selectionModeBinding);
             AddBinding(_hasStartBinding);
             AddBinding(_hasDestinationBinding);
@@ -167,6 +214,30 @@ namespace CS2_JourneyPlanner
 
             AddBinding(_startRoadNameBinding);
             AddBinding(_destinationRoadNameBinding);
+
+            AddBinding(
+                new TriggerBinding(
+                    BindingGroup,
+                    "OpenWindow",
+                    OpenWindow
+                )
+            );
+
+            AddBinding(
+                new TriggerBinding(
+                    BindingGroup,
+                    "CloseWindow",
+                    CloseWindow
+                )
+            );
+
+            AddBinding(
+                new TriggerBinding(
+                    BindingGroup,
+                    "ToggleWindow",
+                    ToggleWindow
+                )
+            );
 
             AddBinding(
                 new TriggerBinding(
@@ -221,8 +292,59 @@ namespace CS2_JourneyPlanner
             );
         }
 
+        private void OpenWindow()
+        {
+            if (_windowVisible)
+            {
+                return;
+            }
+
+            _windowVisible = true;
+
+            _windowVisibleBinding.Update(true);
+
+            Mod.Log.Info(
+                "Journey Planner window opened."
+            );
+        }
+
+        private void CloseWindow()
+        {
+            if (!_windowVisible)
+            {
+                return;
+            }
+
+            /*
+             * Stop map selection before hiding the panel.
+             */
+            CancelActiveSelection();
+
+            _windowVisible = false;
+
+            _windowVisibleBinding.Update(false);
+
+            Mod.Log.Info(
+                "Journey Planner window closed."
+            );
+        }
+
+        private void ToggleWindow()
+        {
+            if (_windowVisible)
+            {
+                CloseWindow();
+            }
+            else
+            {
+                OpenWindow();
+            }
+        }
+
         private void SelectStart()
         {
+            OpenWindow();
+
             Mod.Log.Info(
                 "SelectStart trigger received."
             );
@@ -247,6 +369,8 @@ namespace CS2_JourneyPlanner
 
         private void SelectDestination()
         {
+            OpenWindow();
+
             Mod.Log.Info(
                 "SelectDestination trigger received."
             );
@@ -412,6 +536,35 @@ namespace CS2_JourneyPlanner
             );
         }
 
+        private void CancelActiveSelection()
+        {
+            bool wasSelecting =
+                CurrentSelectionMode !=
+                SelectionMode.None;
+
+            CurrentSelectionMode =
+                SelectionMode.None;
+
+            _selectionModeBinding.Update(
+                CurrentSelectionMode.ToString()
+            );
+
+            if (_gameToolSystem.activeTool == _toolSystem)
+            {
+                _toolSystem.ReturnToDefaultTool();
+            }
+
+            if (wasSelecting)
+            {
+                UpdateStatus();
+
+                Mod.Log.Info(
+                    "Active Journey Planner selection " +
+                    "cancelled because the window closed."
+                );
+            }
+        }
+
         private void ClearStart()
         {
             StartOwner = Entity.Null;
@@ -470,6 +623,8 @@ namespace CS2_JourneyPlanner
 
         private void ClearAll()
         {
+            CancelActiveSelection();
+
             StartOwner = Entity.Null;
             DestinationOwner = Entity.Null;
 
@@ -481,9 +636,6 @@ namespace CS2_JourneyPlanner
 
             StartRoadName = string.Empty;
             DestinationRoadName = string.Empty;
-
-            CurrentSelectionMode =
-                SelectionMode.None;
 
             _hasStartBinding.Update(false);
             _hasDestinationBinding.Update(false);
@@ -510,10 +662,6 @@ namespace CS2_JourneyPlanner
 
             _destinationEntityTypeBinding.Update(
                 string.Empty
-            );
-
-            _selectionModeBinding.Update(
-                CurrentSelectionMode.ToString()
             );
 
             _statusBinding.Update(
