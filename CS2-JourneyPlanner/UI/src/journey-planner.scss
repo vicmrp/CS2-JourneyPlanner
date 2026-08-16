@@ -1,0 +1,221 @@
+.jp-toolbar-button {
+  min-width: 42rem;
+  height: 42rem;
+  margin-left: 6rem;
+  padding: 0 10rem;
+  border: 1rem solid rgba(255,255,255,.20);
+  border-radius: 6rem;
+  background: #2879c7;
+  color: #fff;
+  font-size: 13rem;
+  font-weight: 700;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.jp-toolbar-button:hover { background: #3691e5; }
+.jp-toolbar-button-active { background: #1d68aa; }
+
+.jp-panel {
+  position: absolute;
+  top: 50rem;
+  right: 0rem;
+  left: auto;
+  width: 440rem;
+  max-height: 790rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1rem solid rgba(255,255,255,.12);
+  border-radius: 12rem;
+  background: rgba(10,19,36,.97);
+  color: #f4f7ff;
+  box-shadow: 0 12rem 40rem rgba(0,0,0,.40);
+  font-size: 13rem;
+  pointer-events: auto;
+  z-index: 999999;
+}
+.jp-panel, .jp-panel * { pointer-events: auto; }
+.jp-panel button { cursor: pointer; }
+
+.jp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18rem 18rem 12rem;
+}
+.jp-title { font-size: 21rem; font-weight: 800; color: #fff; }
+.jp-subtitle { margin-top: 2rem; color: #a9b5ca; font-size: 11rem; }
+.jp-icon-button {
+  width: 34rem; height: 34rem; padding: 0; border: 0; border-radius: 7rem;
+  background: #34455b; color: #fff; display: flex; align-items: center;
+  justify-content: center; font-size: 22rem; font-weight: 600;
+}
+.jp-icon-button:hover { background: #4b607c; }
+
+.jp-search {
+  margin: 0 16rem 14rem;
+  border: 1rem solid rgba(220,230,255,.28);
+  border-radius: 11rem;
+  overflow: hidden;
+  background: rgba(4,12,29,.90);
+}
+.jp-location-row {
+  width: 100%; min-height: 68rem; padding: 10rem 14rem;
+  display: flex; align-items: center; gap: 12rem; text-align: left;
+  border: 0; background: transparent; color: #fff;
+  transition: background .12s ease, box-shadow .12s ease;
+}
+.jp-location-row:hover { background: rgba(255,255,255,.06); }
+.jp-location-row + .jp-location-row { border-top: 1rem solid rgba(255,255,255,.13); }
+.jp-location-selected { background: rgba(35,113,167,.16); }
+.jp-location-required {
+  background: rgba(220,150,40,.14);
+  box-shadow: inset 0 0 0 2rem rgba(245,178,60,.65);
+}
+.jp-node {
+  width: 14rem; height: 14rem; border: 2rem solid #fff; border-radius: 50%;
+  flex: 0 0 auto;
+}
+.end-node { width: 12rem; height: 12rem; border-radius: 2rem; transform: rotate(45deg); }
+.jp-location-copy { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3rem; }
+.jp-location-copy small { color: #9eacc1; font-size: 11rem; }
+.jp-location-copy b {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #fff; font-size: 14rem; font-weight: 700;
+}
+.jp-location-copy em { color: #7fa9c9; font-size: 9rem; font-style: normal; font-weight: 500; }
+.jp-location-copy .jp-required-copy { color: #f0b85d; }
+.jp-selected-badge {
+  flex: 0 0 auto; padding: 4rem 7rem; border-radius: 10rem;
+  background: rgba(39,152,232,.22); color: #9ed7ff; font-size: 9rem; font-weight: 700;
+}
+
+.jp-help, .jp-loading {
+  margin: 0 16rem 14rem; padding: 12rem; border-radius: 8rem;
+  background: rgba(255,255,255,.06); color: #b8c4d7; line-height: 1.35;
+}
+.jp-help-required {
+  background: rgba(220,150,40,.10);
+  color: #f1d4a4;
+  border: 1rem solid rgba(245,178,60,.25);
+}
+.jp-spinner {
+  display: inline-block; width: 11rem; height: 11rem; margin-right: 8rem;
+  border: 2rem solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%;
+}
+
+.jp-plan-button, .jp-follow, .jp-map-toggle {
+  border: 0; border-radius: 7rem; padding: 9rem 11rem;
+  background: #2d6e95; color: #fff; font-weight: 700;
+}
+.jp-plan-button:hover, .jp-follow:hover, .jp-map-toggle:hover { background: #3d88b5; }
+.jp-plan-button, .jp-follow { margin: 0 16rem 12rem; width: calc(100% - 32rem); }
+.jp-plan-button { background: #2879c7; }
+
+
+.jp-route-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 7rem;
+  flex-wrap: wrap;
+
+  width: 100%;
+  min-width: 0;
+}
+
+.jp-route-actions button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.jp-delete-route {
+  border: 0;
+  border-radius: 7rem;
+  padding: 9rem 11rem;
+  background: rgba(176, 55, 55, .85);
+  color: #fff;
+  font-weight: 700;
+}
+
+.jp-delete-route:hover {
+  background: rgba(205, 67, 67, .95);
+}
+
+.jp-trip { border-top: 1rem solid rgba(255,255,255,.10); }
+.jp-trip-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10rem;
+
+  padding:
+    16rem
+    18rem
+    8rem;
+}
+.jp-trip-head > div {
+  min-width: 0;
+}
+
+.jp-trip-head small { color: #9cabc1; }
+.jp-trip-head h2 {
+  margin:
+    2rem
+    0
+    0;
+
+  max-width: 100%;
+
+  color: #ffffff;
+
+  font-size: 20rem;
+  line-height: 1.15;
+
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.jp-summary { display: flex; gap: 7rem; flex-wrap: wrap; padding: 0 18rem 15rem; }
+.jp-summary span {
+  padding: 5rem 9rem; border-radius: 14rem; background: #26334a;
+  color: #d6ddec; font-size: 11rem;
+}
+
+.jp-timeline { padding: 3rem 16rem 8rem; }
+.jp-leg { display: grid; grid-template-columns: 36rem 1fr; }
+.jp-leg-rail { display: flex; flex-direction: column; align-items: center; }
+.jp-mode-icon {
+  width: 27rem; height: 27rem; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; background: #56657a; color: #fff; font-size: 10rem;
+  font-weight: 900; flex: 0 0 auto;
+}
+.jp-rail-line {
+  width: 4rem; min-height: 68rem; flex: 1 1 auto; margin: 3rem 0;
+  background: #67748a; border-radius: 3rem;
+}
+.jp-mode-bus .jp-mode-icon, .jp-mode-bus .jp-rail-line { background: #2798e8; }
+.jp-mode-tram .jp-mode-icon, .jp-mode-tram .jp-rail-line { background: #37ae5b; }
+.jp-mode-metro .jp-mode-icon, .jp-mode-metro .jp-rail-line { background: #8b54da; }
+.jp-mode-train .jp-mode-icon, .jp-mode-train .jp-rail-line { background: #e88727; }
+
+.jp-leg-card {
+  margin: 0 0 11rem 4rem; padding: 12rem 14rem; border-radius: 10rem;
+  background: rgba(31,45,70,.94);
+}
+.jp-mode-walk .jp-leg-card { background: rgba(22,32,49,.82); }
+.jp-leg-title-row {
+  display: flex; justify-content: space-between; gap: 10rem;
+  margin-bottom: 8rem; font-size: 15rem;
+}
+.jp-leg-title-row span { color: #b8c4d6; font-size: 12rem; }
+.jp-from, .jp-to { color: #fff; font-size: 14rem; font-weight: 700; line-height: 1.25; }
+.jp-to-label { margin: 5rem 0; color: #8e9cb0; font-size: 11rem; }
+.jp-leg-meta {
+  display: flex; gap: 12rem; margin-top: 10rem; padding-top: 9rem;
+  border-top: 1rem solid rgba(255,255,255,.10); color: #c3ccdb; font-size: 11rem;
+}
+.jp-status { padding: 9rem 16rem 13rem; color: #8fa0b8; font-size: 10rem; line-height: 1.3; }
+
+.jp-panel::-webkit-scrollbar { width: 6rem; }
+.jp-panel::-webkit-scrollbar-track { background: transparent; }
+.jp-panel::-webkit-scrollbar-thumb { border-radius: 6rem; background: rgba(255,255,255,.18); }
+.jp-panel::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.28); }

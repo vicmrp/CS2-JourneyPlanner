@@ -1,495 +1,229 @@
 using System;
+using Game.Buildings;
 using Game.Common;
-using Game.Net;
+using Game.Creatures;
+using Game.Objects;
+using Unity.Collections;
 using Game.Prefabs;
 using Game.Tools;
-using Game.UI;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace CS2_JourneyPlanner
 {
-    public sealed partial class JourneyPlannerToolSystem
-        : ToolBaseSystem
+    public sealed partial class JourneyPlannerToolSystem : ToolBaseSystem
     {
-        private JourneyPlannerUISystem _uiSystem;
-        private NameSystem _nameSystem;
+        private JourneyPlannerUISystem _ui;
+        private Entity _highlighted = Entity.Null;
 
-        private bool _raycastInitializationLogged;
-
-        /*
-         * The road edge currently receiving the blue
-         * hover highlight.
-         */
-        private Entity _highlightedEntity;
-
-        public override string toolID =>
-            "JourneyPlannerTool";
+        public override string toolID => "JourneyPlannerNativeTool";
 
         protected override void OnCreate()
         {
             base.OnCreate();
-
-            _uiSystem =
-                World.GetOrCreateSystemManaged<
-                    JourneyPlannerUISystem
-                >();
-
-            _nameSystem =
-                World.GetOrCreateSystemManaged<
-                    NameSystem
-                >();
-
-            _highlightedEntity = Entity.Null;
-
-            Mod.Log.Info(
-                "JourneyPlannerToolSystem.OnCreate."
-            );
+            _ui = World.GetOrCreateSystemManaged<JourneyPlannerUISystem>();
         }
 
         protected override void OnStartRunning()
         {
             base.OnStartRunning();
-
             applyAction.shouldBeEnabled = true;
             cancelAction.shouldBeEnabled = true;
-
-            _highlightedEntity = Entity.Null;
-
-            Mod.Log.Info(
-                "Journey Planner tool activated."
-            );
+            InitializeRaycast();
         }
 
         protected override void OnStopRunning()
         {
-            ClearHoverHighlight();
-
+            ClearHighlight();
             applyAction.shouldBeEnabled = false;
             cancelAction.shouldBeEnabled = false;
-
-            Mod.Log.Info(
-                "Journey Planner tool deactivated."
-            );
-
             base.OnStopRunning();
         }
 
-        public override PrefabBase GetPrefab()
-        {
-            return null;
-        }
-
-        public override bool TrySetPrefab(
-            PrefabBase prefab
-        )
-        {
-            return false;
-        }
+        public override PrefabBase GetPrefab() => null;
+        public override bool TrySetPrefab(PrefabBase prefab) => false;
 
         public override void InitializeRaycast()
         {
             base.InitializeRaycast();
-
-            /*
-             * Only road-network entities should be returned.
-             */
-            m_ToolRaycastSystem.typeMask =
-                TypeMask.Net;
-
-            m_ToolRaycastSystem.netLayerMask =
-                Layer.Road;
-
-            if (_raycastInitializationLogged)
-            {
-                return;
-            }
-
-            _raycastInitializationLogged = true;
-
-            Mod.Log.Info(
-                "Journey Planner raycast initialized " +
-                "for roads only."
-            );
+            TypeMask mask = default;
+            foreach (TypeMask value in Enum.GetValues(typeof(TypeMask)))
+                mask |= value;
+            m_ToolRaycastSystem.typeMask = mask;
         }
 
-        protected override JobHandle OnUpdate(
-            JobHandle inputDeps
-        )
+        protected override JobHandle OnUpdate(JobHandle inputDeps)
         {
-            UpdateHoverHighlight();
+            bool hasResult = GetRaycastResult(out Entity hitEntity, out RaycastHit hit);
+            Entity selectable = hasResult
+                ? (_ui.WantsCitizenSelection ? ResolveCitizen(hitEntity, hit.m_HitPosition) : ResolveUsefulEntity(hitEntity, hit.m_HitPosition))
+                : Entity.Null;
+            UpdateHighlight(selectable);
 
             if (cancelAction.WasPressedThisFrame())
             {
-                HandleCancel();
-
+                _ui.CancelSelection();
                 return inputDeps;
             }
 
             if (applyAction.WasPressedThisFrame())
             {
-                ProcessMapClick();
+                if (!hasResult || selectable == Entity.Null || !EntityManager.Exists(selectable))
+                {
+                    _ui.PublishStatus("No usable map entity was found under the cursor.");
+                    return inputDeps;
+                }
+
+                _ui.AcceptSelection(selectable, hit.m_HitPosition);
             }
 
             return inputDeps;
         }
 
-        private void UpdateHoverHighlight()
-        {
-            bool hasResult = GetRaycastResult(
-                out Entity entity,
-                out Game.Common.RaycastHit hit
-            );
 
-            if (
-                !hasResult ||
-                !IsRoadEdge(entity)
-            )
+        private Entity ResolveCitizen(Entity clicked, float3 hitPosition)
+        {
+            Entity direct = ResolveCitizenThroughOwners(clicked);
+            if (direct != Entity.Null) return direct;
+            return FindNearestCitizen(hitPosition, 8.0f);
+        }
+
+        private Entity ResolveCitizenThroughOwners(Entity clicked)
+        {
+            Entity current = clicked;
+            for (int depth = 0; depth < 12; depth++)
             {
-                ClearHoverHighlight();
+                if (current == Entity.Null || !EntityManager.Exists(current)) break;
+                if (EntityManager.HasComponent<Human>(current) || EntityManager.HasComponent<Game.Creatures.Resident>(current)) return current;
+                if (!EntityManager.HasComponent<Owner>(current)) break;
+                Entity owner = EntityManager.GetComponentData<Owner>(current).m_Owner;
+                if (owner == Entity.Null || owner == current) break;
+                current = owner;
+            }
+            return Entity.Null;
+        }
+
+        private Entity FindNearestCitizen(float3 hitPosition, float maxDistance)
+        {
+            EntityQuery query = GetEntityQuery(ComponentType.ReadOnly<Game.Objects.Transform>());
+            using (NativeArray<Entity> entities = query.ToEntityArray(Allocator.TempJob))
+            using (NativeArray<Game.Objects.Transform> transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.TempJob))
+            {
+                Entity best = Entity.Null;
+                float bestDistanceSq = maxDistance * maxDistance;
+                for (int i = 0; i < entities.Length; i++)
+                {
+                    float distanceSq = math.distancesq(transforms[i].m_Position, hitPosition);
+                    if (distanceSq >= bestDistanceSq) continue;
+                    Entity citizen = ResolveCitizenThroughOwners(entities[i]);
+                    if (citizen == Entity.Null) continue;
+                    bestDistanceSq = distanceSq;
+                    best = citizen;
+                }
+                return best;
+            }
+        }
+
+        private Entity ResolveUsefulEntity(Entity hit, float3 hitPosition)
+        {
+            if (hit == Entity.Null || !EntityManager.Exists(hit))
+                return FindNearestBuilding(hitPosition, 35.0f);
+
+            Entity current = hit;
+
+            // CurrentLocation is reliable for buildings and for actual humans.
+            // Never return a Route/Waypoint/Line Tool entity as A/B: those were
+            // the cause of the v0.3.2 request hanging forever.
+            for (int depth = 0; depth < 12; depth++)
+            {
+                if (current == Entity.Null || !EntityManager.Exists(current))
+                    break;
+
+                if (EntityManager.HasComponent<Building>(current))
+                    return current;
+                if (EntityManager.HasComponent<Human>(current) ||
+                    EntityManager.HasComponent<Game.Creatures.Resident>(current))
+                    return current;
+
+                if (!EntityManager.HasComponent<Owner>(current))
+                    break;
+
+                Entity owner = EntityManager.GetComponentData<Owner>(current).m_Owner;
+                if (owner == Entity.Null || owner == current)
+                    break;
+                current = owner;
+            }
+
+            // Clicking a stop, route line, lane, prop or attachment often hits an
+            // entity that is not a valid CurrentLocation target. Resolve the click
+            // spatially to the nearest real building instead of returning that entity.
+            return FindNearestBuilding(hitPosition, 35.0f);
+        }
+
+        private Entity FindNearestBuilding(float3 hitPosition, float maxDistance)
+        {
+            EntityQuery query = GetEntityQuery(
+                ComponentType.ReadOnly<Building>(),
+                ComponentType.ReadOnly<Game.Objects.Transform>());
+
+            using (NativeArray<Entity> entities = query.ToEntityArray(Allocator.TempJob))
+            using (NativeArray<Game.Objects.Transform> transforms =
+                   query.ToComponentDataArray<Game.Objects.Transform>(Allocator.TempJob))
+            {
+                Entity best = Entity.Null;
+                float bestDistanceSq = maxDistance * maxDistance;
+                for (int i = 0; i < entities.Length; i++)
+                {
+                    float distanceSq = math.distancesq(transforms[i].m_Position, hitPosition);
+                    if (distanceSq >= bestDistanceSq)
+                        continue;
+                    bestDistanceSq = distanceSq;
+                    best = entities[i];
+                }
+                return best;
+            }
+        }
+
+        private void UpdateHighlight(Entity entity)
+        {
+            if (entity == _highlighted)
                 return;
-            }
 
-            if (entity == _highlightedEntity)
-            {
+            ClearHighlight();
+            if (entity == Entity.Null || !EntityManager.Exists(entity))
                 return;
-            }
-
-            ClearHoverHighlight();
-            SetHoverHighlight(entity);
-        }
-
-        private void SetHoverHighlight(
-            Entity entity
-        )
-        {
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                return;
-            }
-
-            if (
-                !EntityManager.HasComponent<
-                    Highlighted
-                >(entity)
-            )
-            {
-                EntityManager.AddComponent<
-                    Highlighted
-                >(entity);
-            }
-
-            _highlightedEntity = entity;
-        }
-
-        private void ClearHoverHighlight()
-        {
-            if (_highlightedEntity == Entity.Null)
-            {
-                return;
-            }
-
-            if (
-                EntityManager.Exists(
-                    _highlightedEntity
-                ) &&
-                EntityManager.HasComponent<
-                    Highlighted
-                >(_highlightedEntity)
-            )
-            {
-                EntityManager.RemoveComponent<
-                    Highlighted
-                >(_highlightedEntity);
-            }
-
-            _highlightedEntity = Entity.Null;
-        }
-
-        private void ProcessMapClick()
-        {
-            bool hasResult = GetRaycastResult(
-                out Entity roadEdge,
-                out Game.Common.RaycastHit hit
-            );
-
-            Mod.Log.Info(
-                $"Apply action pressed. " +
-                $"HasRaycastResult={hasResult}"
-            );
-
-            if (!hasResult)
-            {
-                RejectPoint(
-                    "No road was found under the cursor."
-                );
-
-                return;
-            }
-
-            float3 position =
-                hit.m_HitPosition;
-
-            if (
-                !TryValidateRoad(
-                    roadEdge,
-                    position,
-                    out string rejectionReason
-                )
-            )
-            {
-                RejectPoint(rejectionReason);
-                return;
-            }
-
-            Entity aggregateEntity =
-                ResolveRoadAggregate(roadEdge);
-
-            string roadName =
-                ResolveRoadName(
-                    roadEdge,
-                    aggregateEntity
-                );
-
-            Mod.Log.Info(
-                $"Road selected. " +
-                $"Edge={roadEdge}, " +
-                $"Aggregate={aggregateEntity}, " +
-                $"Name={roadName}, " +
-                $"Position=({position.x:F1}, " +
-                $"{position.y:F1}, " +
-                $"{position.z:F1})"
-            );
-
-            _uiSystem.ConfirmRoadSelection(
-                roadEdge,
-                aggregateEntity,
-                position,
-                roadName
-            );
-        }
-
-        private bool TryValidateRoad(
-            Entity entity,
-            float3 position,
-            out string rejectionReason
-        )
-        {
-            if (!math.all(math.isfinite(position)))
-            {
-                rejectionReason =
-                    "The selected point has invalid coordinates.";
-
-                return false;
-            }
-
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                rejectionReason =
-                    "No road was found under the cursor.";
-
-                return false;
-            }
-
-            if (!IsRoadEdge(entity))
-            {
-                rejectionReason =
-                    "The selected network entity is not a road.";
-
-                return false;
-            }
-
-            rejectionReason = string.Empty;
-
-            return true;
-        }
-
-        private bool IsRoadEdge(
-            Entity entity
-        )
-        {
-            if (
-                entity == Entity.Null ||
-                !EntityManager.Exists(entity)
-            )
-            {
-                return false;
-            }
-
-            return
-                EntityManager.HasComponent<Edge>(entity) &&
-                EntityManager.HasComponent<Road>(entity);
-        }
-
-        private Entity ResolveRoadAggregate(
-            Entity roadEdge
-        )
-        {
-            if (
-                roadEdge == Entity.Null ||
-                !EntityManager.Exists(roadEdge)
-            )
-            {
-                return Entity.Null;
-            }
-
-            if (
-                !EntityManager.HasComponent<
-                    Aggregated
-                >(roadEdge)
-            )
-            {
-                Mod.Log.Warn(
-                    $"Road edge {roadEdge} does not have " +
-                    "Game.Net.Aggregated."
-                );
-
-                return Entity.Null;
-            }
-
-            Aggregated aggregated =
-                EntityManager.GetComponentData<
-                    Aggregated
-                >(roadEdge);
-
-            Entity aggregateEntity =
-                aggregated.m_Aggregate;
-
-            if (
-                aggregateEntity == Entity.Null ||
-                !EntityManager.Exists(aggregateEntity)
-            )
-            {
-                Mod.Log.Warn(
-                    $"Road aggregate {aggregateEntity} " +
-                    $"for edge {roadEdge} is invalid."
-                );
-
-                return Entity.Null;
-            }
-
-            return aggregateEntity;
-        }
-
-        private string ResolveRoadName(
-            Entity roadEdge,
-            Entity aggregateEntity
-        )
-        {
-            /*
-             * The rendered road label belongs to the aggregate,
-             * not to the individual road edge.
-             */
-            Entity namingEntity =
-                aggregateEntity != Entity.Null
-                    ? aggregateEntity
-                    : roadEdge;
 
             try
             {
-                string roadName =
-                    _nameSystem.GetRenderedLabelName(
-                        namingEntity
-                    );
-
-                if (!string.IsNullOrWhiteSpace(roadName))
-                {
-                    Mod.Log.Info(
-                        $"Resolved road name. " +
-                        $"Entity={namingEntity}, " +
-                        $"Name={roadName}"
-                    );
-
-                    return roadName;
-                }
-
-                /*
-                 * GetRenderedLabelName should normally return the
-                 * generated or custom road name. This fallback
-                 * checks explicitly for a custom name.
-                 */
-                if (
-                    _nameSystem.TryGetCustomName(
-                        namingEntity,
-                        out string customName
-                    ) &&
-                    !string.IsNullOrWhiteSpace(customName)
-                )
-                {
-                    Mod.Log.Info(
-                        $"Resolved custom road name. " +
-                        $"Entity={namingEntity}, " +
-                        $"Name={customName}"
-                    );
-
-                    return customName;
-                }
+                if (!EntityManager.HasComponent<Highlighted>(entity))
+                    EntityManager.AddComponent<Highlighted>(entity);
+                _highlighted = entity;
             }
-            catch (Exception exception)
+            catch
             {
-                Mod.Log.Error(
-                    $"Failed to resolve road name. " +
-                    $"RoadEdge={roadEdge}, " +
-                    $"Aggregate={aggregateEntity}, " +
-                    $"Exception={exception}"
-                );
+                _highlighted = Entity.Null;
             }
-
-            Mod.Log.Warn(
-                $"No road name was resolved. " +
-                $"RoadEdge={roadEdge}, " +
-                $"Aggregate={aggregateEntity}"
-            );
-
-            return "Unnamed road";
         }
 
-        private void RejectPoint(
-            string reason
-        )
+        private void ClearHighlight()
         {
-            Mod.Log.Warn(
-                $"Road selection failed. Reason={reason}"
-            );
-
-            _uiSystem.RejectSelection(reason);
-        }
-
-        private void HandleCancel()
-        {
-            Mod.Log.Info(
-                "Cancel action pressed."
-            );
-
-            ClearHoverHighlight();
-
-            _uiSystem.CancelSelection();
-
-            ReturnToDefaultTool();
+            if (_highlighted != Entity.Null && EntityManager.Exists(_highlighted))
+            {
+                try
+                {
+                    if (EntityManager.HasComponent<Highlighted>(_highlighted))
+                        EntityManager.RemoveComponent<Highlighted>(_highlighted);
+                }
+                catch { }
+            }
+            _highlighted = Entity.Null;
         }
 
         public void ReturnToDefaultTool()
         {
-            if (m_ToolSystem.activeTool != this)
-            {
-                return;
-            }
-
-            ClearHoverHighlight();
-
-            Mod.Log.Info(
-                "Returning to DefaultToolSystem."
-            );
-
-            m_ToolSystem.activeTool =
-                m_DefaultToolSystem;
+            if (m_ToolSystem != null && m_DefaultToolSystem != null && m_ToolSystem.activeTool == this)
+                m_ToolSystem.activeTool = m_DefaultToolSystem;
         }
     }
 }

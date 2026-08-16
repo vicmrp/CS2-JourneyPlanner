@@ -1,37 +1,56 @@
-﻿<Publish>
-	<!--Id must be set in order to update existed mod. it is not required for publishing mod for the first time-->
-	<ModId Value="" />
-	<!--Name of the mod to display to players-->
-	<DisplayName Value="CS2_JourneyPlanner" />
-	<!--Short description of the mod-->
-	<ShortDescription Value="Imagine yourself as a Sim in your city, trying to use the journey planner to get from A to B." />
-	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
-	<!--LongDescription Value="Imagine yourself as a Sim in your city, trying to use the journey planner to get from A to B." /-->
-	<LongDescription>
-Imagine yourself as a Sim in your city, trying to use the journey planner to get from A to B.
-	</LongDescription>
-	<!--Thumbnail-->
-	<Thumbnail Value="Properties/Thumbnail.png" />
-	<!--Screenshot, can be set multiple times-->
-	<Screenshot Value="" />
-	<!--Tag, can be set multiple times-->
-	<Tag Value="" />
-	<!--Link to the forum post where the mod can be discussed-->
-	<ForumLink Value="" />
-	<!--Version of the mod-->
-	<ModVersion Value="1.0" />
-	<!--Recommended version of the base game to use the mod-->
-	<GameVersion Value="1.0.*" />
-	<!--Dependency for the mod, can be set multiple times-->
-	<Dependency Id="" />
-	<!--Required DLC, can be set multiple times. Supported values are "Landmark Buildings", "San Fransisco Set", "Beach Properties", "Urban Promenades", "Modern Architecture"-->
-	<RequiredDLC Value="" />
-	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
-	<ChangeLog Value="" />
-	<!--<ChangeLog>
-	</ChangeLog>-->
-	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
-	<ExternalLink Type="" Url="" />
-	<!--Supported values Public, Private, Unlisted-->
-	<AccessLevel Value="Public" />
+<?xml version="1.0" encoding="utf-8"?>
+<Publish>
+  <!-- Empty ModId = publish as a new Paradox Mods item -->
+  <ModId Value="" />
+
+  <DisplayName Value="Journey Planner" />
+  <ShortDescription Value="Plan journeys through your city by selecting citizens or buildings, using CS2's native routes and public transport." />
+
+  <LongDescription>
+Journey Planner lets you explore your city from a citizen's point of view.
+
+**Select a citizen**
+Click a citizen while Journey Planner is open. If the citizen already has a native CS2 journey, Journey Planner reads and displays it automatically.
+
+**Plan from building to building**
+Click a building to set the start, then click another building for the destination. The journey calculates automatically once both points are selected.
+
+**Native journey information**
+Journey Planner uses Cities: Skylines II's own path data to show walking and public-transport legs, stops and route information. The route can also be drawn directly in the city.
+
+**Quality-of-life features**
+- JP button in the top-right toolbar
+- Automatic citizen journey detection
+- Automatic A to B calculation
+- Click Start or Destination to open the normal CS2 info panel
+- Hide/show rendered route
+- Delete route without clearing Start and Destination
+- Recalculate the same journey
+- Press ESC to close Journey Planner
+
+Journey Planner is intended as a player-facing journey viewer and planner. It does not intentionally alter the simulation or transport logic.
+  </LongDescription>
+
+  <Thumbnail Value="Properties/Thumbnail.png" />
+
+
+
+  <Tag Value="Transportation" />
+  <Tag Value="UI" />
+
+  <ModVersion Value="1.0" />
+  <GameVersion Value="1.*" />
+
+  <ChangeLog>
+Initial public release.
+- Select citizens directly to inspect their current native journey
+- Select two buildings to plan an A to B journey automatically
+- Native walking and public-transport legs
+- Route visualization in the city
+- Open normal CS2 info panels from selected Start/Destination rows
+- Hide, show, delete and recalculate routes
+- JP toolbar button and ESC-to-close support
+  </ChangeLog>
+
+  <AccessLevel Value="Public" />
 </Publish>
