@@ -1,56 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Publish>
-  <!-- Empty ModId = publish as a new Paradox Mods item -->
-  <ModId Value="" />
+	<ModId Value="155518" />
 
-  <DisplayName Value="Journey Planner" />
-  <ShortDescription Value="Plan journeys through your city by selecting citizens or buildings, using CS2's native routes and public transport." />
+	<DisplayName Value="Journey Planner" />
 
-  <LongDescription>
-Journey Planner lets you explore your city from a citizen's point of view.
+	<ShortDescription Value="A small none gameplay chancing tool that help u see how citizens comes around in your city." />
 
-**Select a citizen**
-Click a citizen while Journey Planner is open. If the citizen already has a native CS2 journey, Journey Planner reads and displays it automatically.
+	<LongDescription>
+Just like in real life, when you use public transport in 2026, you typically use a website or an app to plan your journey. In Denmark, we use Rejseplanen.dk (web app). I wanted to create a UI experience that looks and feels similar to this.
 
-**Plan from building to building**
-Click a building to set the start, then click another building for the destination. The journey calculates automatically once both points are selected.
+The reason I wanted to create this tool was to be able to see what a journey from A to B from a citizens point of view.
 
-**Native journey information**
-Journey Planner uses Cities: Skylines II's own path data to show walking and public-transport legs, stops and route information. The route can also be drawn directly in the city.
+I developed this mod using ChatGPT to help me reverse-engineer how the game's pathfinding system works.
 
-**Quality-of-life features**
-- JP button in the top-right toolbar
-- Automatic citizen journey detection
-- Automatic A to B calculation
-- Click Start or Destination to open the normal CS2 info panel
-- Hide/show rendered route
-- Delete route without clearing Start and Destination
-- Recalculate the same journey
-- Press ESC to close Journey Planner
+Great news: During my reverse-engineering journey, I discovered that citizens actually do this planning themselves, including planning interchanges! So you can actually click on a citizen and see their full journey.
 
-Journey Planner is intended as a player-facing journey viewer and planner. It does not intentionally alter the simulation or transport logic.
-  </LongDescription>
+Bug: v1.0 currently has some issues selecting citizens who are standing close to or inside buildings. I'll try to fix this when I have time.
+	</LongDescription>
 
-  <Thumbnail Value="Properties/Thumbnail.png" />
+	<Thumbnail Value="Properties/Thumbnail.png" />
 
+	<Tag Value="" />
 
+	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/journey-planner.1938608/" />
 
-  <Tag Value="Transportation" />
-  <Tag Value="UI" />
+	<ModVersion Value="1.1" />
 
-  <ModVersion Value="1.0" />
-  <GameVersion Value="1.*" />
+	<GameVersion Value="1.*" />
 
-  <ChangeLog>
-Initial public release.
-- Select citizens directly to inspect their current native journey
-- Select two buildings to plan an A to B journey automatically
-- Native walking and public-transport legs
-- Route visualization in the city
-- Open normal CS2 info panels from selected Start/Destination rows
-- Hide, show, delete and recalculate routes
-- JP toolbar button and ESC-to-close support
-  </ChangeLog>
+	<Dependency Id="" />
 
-  <AccessLevel Value="Public" />
+	<RequiredDLC Value="" />
+
+	<ChangeLog>
+Fixed issue with 
+	</ChangeLog>
+
+	<ExternalLink Type="github" Url="https://github.com/vicmrp/CS2-JourneyPlanner" />
+
+	<AccessLevel Value="Public" />
 </Publish>

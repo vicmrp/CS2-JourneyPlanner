@@ -56,9 +56,30 @@ namespace CS2_JourneyPlanner
         protected override JobHandle OnUpdate(JobHandle inputDeps)
         {
             bool hasResult = GetRaycastResult(out Entity hitEntity, out RaycastHit hit);
-            Entity selectable = hasResult
-                ? (_ui.WantsCitizenSelection ? ResolveCitizen(hitEntity, hit.m_HitPosition) : ResolveUsefulEntity(hitEntity, hit.m_HitPosition))
-                : Entity.Null;
+
+            Entity selectable = Entity.Null;
+            if (hasResult)
+            {
+                // When JP is choosing a citizen/start point, citizens get first refusal.
+                // This makes pedestrians selectable even when the native raycast lands on
+                // a bus stop, tram platform, lane, shelter, or other surface beneath them.
+                if (_ui.PreferCitizenUnderCursor)
+                {
+                    selectable = ResolveCitizen(hitEntity, hit.m_HitPosition);
+                }
+
+                // If no citizen is close enough to the cursor, fall back to JP's normal
+                // building/useful-entity resolution. Destination selection always comes here.
+                if (selectable == Entity.Null)
+                {
+                    selectable = _ui.WantsCitizenSelection
+                        ? Entity.Null
+                        : ResolveUsefulEntity(hitEntity, hit.m_HitPosition);
+                }
+            }
+
+            // Highlight exactly what the next click will select. For citizens this means
+            // the pedestrian receives the game's normal blue hover outline while JP is open.
             UpdateHighlight(selectable);
 
             if (cancelAction.WasPressedThisFrame())
@@ -86,7 +107,7 @@ namespace CS2_JourneyPlanner
         {
             Entity direct = ResolveCitizenThroughOwners(clicked);
             if (direct != Entity.Null) return direct;
-            return FindNearestCitizen(hitPosition, 8.0f);
+            return FindNearestCitizen(hitPosition, 10.0f);
         }
 
         private Entity ResolveCitizenThroughOwners(Entity clicked)

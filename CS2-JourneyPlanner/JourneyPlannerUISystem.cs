@@ -345,6 +345,14 @@ namespace CS2_JourneyPlanner
 
         public bool WantsCitizenSelection => _selectionMode == SelectionMode.ComparisonCitizen;
 
+        // While choosing start A, prefer a citizen under/near the cursor even if
+        // the raycast first hits a stop, platform, lane, shelter, or other surface.
+        // Destination B remains building-only.
+        public bool PreferCitizenUnderCursor =>
+            _selectionMode == SelectionMode.ComparisonCitizen ||
+            _selectionMode == SelectionMode.Origin ||
+            (_selectionMode == SelectionMode.Auto && !_awaitingDestination);
+
         public void CancelSelection()
         {
             _selectionMode = SelectionMode.None;
