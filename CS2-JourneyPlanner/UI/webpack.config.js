@@ -7,11 +7,11 @@ const gray = (text) => `\x1b[90m${text}\x1b[0m`;
 
 const CSII_USERDATAPATH = process.env.CSII_USERDATAPATH;
 
-if (!CSII_USERDATAPATH) {
+if (!CSII_USERDATAPATH && !process.env.UVM_UI_OUTPUT) {
   throw "CSII_USERDATAPATH environment variable is not set, ensure the CSII Modding Toolchain is installed correctly";
 }
 
-const OUTPUT_DIR = `${CSII_USERDATAPATH}\\Mods\\${MOD.id}`;
+const OUTPUT_DIR = process.env.UVM_UI_OUTPUT || `${CSII_USERDATAPATH}\\Mods\\${MOD.id}`;
 
 const banner = `
  * Cities: Skylines II UI Module

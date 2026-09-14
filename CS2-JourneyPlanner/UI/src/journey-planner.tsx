@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { bindValue, trigger, useValue } from "cs2/api";
+import { InputActionConsumer } from "cs2/input";
 import "./journey-planner.scss";
 
 const group = "JourneyPlannerNative";
@@ -17,6 +18,8 @@ const journeyJson$ = bindValue<string>(group, "JourneyJson", "{\"ready\":false}"
 type JourneyLeg = {
   mode: string;
   routeNumber: number;
+  routeName?: string;
+  color?: string;
   from: string;
   to: string;
   distanceMeters: number;
@@ -41,6 +44,7 @@ const modeIcon = (mode: string) => {
     case "metro": return "M";
     case "train": return "R";
     case "ship": return "S";
+    case "air": return "A";
     case "motorcycle": return "MC";
     case "bike": return "BI";
     case "car": return "C";
@@ -49,6 +53,7 @@ const modeIcon = (mode: string) => {
 };
 
 const modeTitle = (leg: JourneyLeg) => {
+  if (leg.routeName) return leg.routeName;
   const n = leg.routeNumber >= 0 ? ` ${leg.routeNumber}` : "";
   switch ((leg.mode || "").toLowerCase()) {
     case "walk": return "Walk";
@@ -57,6 +62,7 @@ const modeTitle = (leg: JourneyLeg) => {
     case "metro": return `Metro${n}`;
     case "train": return `Train${n}`;
     case "ship": return `Ship${n}`;
+    case "air": return `Flight${n}`;
     case "motorcycle": return "Motorcycle";
     case "bike": return "Bicycle";
     case "car": return "Car";
@@ -131,6 +137,7 @@ export const JourneyPlanner = () => {
       </button>
 
       {visible && (
+        <InputActionConsumer actions={{ Close: () => trigger(group, "Close"), Back: () => trigger(group, "Close") }} ignoreFocusState>
         <div className="jp-panel">
           <header className="jp-header">
             <div>
@@ -261,13 +268,16 @@ export const JourneyPlanner = () => {
                 {legs.map((leg, index) => {
                   const mode = (leg.mode || "").toLowerCase();
                   const transit = !["walk", "car", "bike", "motorcycle"].includes(mode);
+                  const color = /^#[0-9a-f]{6}$/i.test(leg.color || "") ? leg.color : undefined;
+                  const rgb = color ? parseInt(color.slice(1), 16) : 0;
+                  const brightness = ((rgb >> 16) * 299 + ((rgb >> 8) & 255) * 587 + (rgb & 255) * 114) / 1000;
                   return (
                     <article className={`jp-leg jp-mode-${mode}`} key={`${index}-${leg.mode}`}>
                       <div className="jp-leg-rail">
-                        <span className="jp-mode-icon">{modeIcon(leg.mode)}</span>
-                        {index < legs.length - 1 && <span className="jp-rail-line" />}
+                        <span className="jp-mode-icon" style={{ backgroundColor: color, color: color && brightness > 145 ? "#101827" : "#fff" }}>{modeIcon(leg.mode)}</span>
+                        {index < legs.length - 1 && <span className="jp-rail-line" style={{ backgroundColor: color }} />}
                       </div>
-                      <div className="jp-leg-card">
+                      <div className="jp-leg-card" style={{ borderLeftColor: color }}>
                         <div className="jp-leg-title-row">
                           <b>{modeTitle(leg)}</b>
                           {mode === "walk" && leg.walkMinutes > 0 && <span>~{leg.walkMinutes} min</span>}
@@ -289,6 +299,7 @@ export const JourneyPlanner = () => {
 
           <footer className="jp-status">{status}</footer>
         </div>
+        </InputActionConsumer>
       )}
     </>
   );

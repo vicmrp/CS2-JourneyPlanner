@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "platform": "paradox",
+  "modId": "155518",
+  "repository": "https://github.com/vicmrp/CS2-JourneyPlanner",
+  "build": {"project": "CS2-JourneyPlanner/CS2-JourneyPlanner.csproj", "configuration": "Release"},
+  "output": [
+    "CS2-JourneyPlanner.dll",
+    "CS2-JourneyPlanner_win_x86_64.dll",
+    "CS2-JourneyPlanner.mjs",
+    "CS2-JourneyPlanner.css",
+    "CS2-JourneyPlanner.mjs.LICENSE.txt"
+  ]
+}

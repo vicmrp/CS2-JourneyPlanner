@@ -60,7 +60,7 @@
 }
 .jp-location-row {
   width: 100%; min-height: 68rem; padding: 10rem 14rem;
-  display: flex; align-items: center; gap: 12rem; text-align: left;
+  display: flex; align-items: center; text-align: left;
   border: 0; background: transparent; color: #fff;
   transition: background .12s ease, box-shadow .12s ease;
 }
@@ -108,7 +108,7 @@
   background: #2d6e95; color: #fff; font-weight: 700;
 }
 .jp-plan-button:hover, .jp-follow:hover, .jp-map-toggle:hover { background: #3d88b5; }
-.jp-plan-button, .jp-follow { margin: 0 16rem 12rem; width: calc(100% - 32rem); }
+.jp-plan-button, .jp-follow { margin: 0 16rem 12rem; width: 408rem; }
 .jp-plan-button { background: #2879c7; }
 
 
@@ -117,7 +117,6 @@
   align-items: center;
   justify-content: flex-end;
 
-  gap: 7rem;
   flex-wrap: wrap;
 
   width: 100%;
@@ -128,6 +127,7 @@
   flex: 0 0 auto;
   white-space: nowrap;
 }
+.jp-route-actions button + button { margin-left: 7rem; }
 
 .jp-delete-route {
   border: 0;
@@ -144,9 +144,8 @@
 
 .jp-trip { border-top: 1rem solid rgba(255,255,255,.10); }
 .jp-trip-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10rem;
+  display: flex;
+  flex-direction: column;
 
   padding:
     16rem
@@ -156,6 +155,7 @@
 .jp-trip-head > div {
   min-width: 0;
 }
+.jp-trip-head > div + div { margin-top: 10rem; }
 
 .jp-trip-head small { color: #9cabc1; }
 .jp-trip-head h2 {
@@ -174,15 +174,16 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-.jp-summary { display: flex; gap: 7rem; flex-wrap: wrap; padding: 0 18rem 15rem; }
+.jp-summary { display: flex; flex-wrap: wrap; padding: 0 18rem 15rem; }
 .jp-summary span {
+  margin-right: 7rem;
   padding: 5rem 9rem; border-radius: 14rem; background: #26334a;
   color: #d6ddec; font-size: 11rem;
 }
 
 .jp-timeline { padding: 3rem 16rem 8rem; }
-.jp-leg { display: grid; grid-template-columns: 36rem 1fr; }
-.jp-leg-rail { display: flex; flex-direction: column; align-items: center; }
+.jp-leg { display: flex; flex-direction: row; align-items: stretch; }
+.jp-leg-rail { width: 36rem; flex: 0 0 36rem; display: flex; flex-direction: column; align-items: center; }
 .jp-mode-icon {
   width: 27rem; height: 27rem; border-radius: 50%; display: flex; align-items: center;
   justify-content: center; background: #56657a; color: #fff; font-size: 10rem;
@@ -198,21 +199,31 @@
 .jp-mode-train .jp-mode-icon, .jp-mode-train .jp-rail-line { background: #e88727; }
 
 .jp-leg-card {
+  flex: 1 1 auto; min-width: 0;
+  border-left: 3rem solid #67748a;
   margin: 0 0 11rem 4rem; padding: 12rem 14rem; border-radius: 10rem;
   background: rgba(31,45,70,.94);
 }
 .jp-mode-walk .jp-leg-card { background: rgba(22,32,49,.82); }
 .jp-leg-title-row {
-  display: flex; justify-content: space-between; gap: 10rem;
+  display: flex; justify-content: space-between;
   margin-bottom: 8rem; font-size: 15rem;
 }
-.jp-leg-title-row span { color: #b8c4d6; font-size: 12rem; }
+.jp-leg-title-row span { color: #b8c4d6; font-size: 12rem; margin-left: 10rem; }
+.jp-leg-title-row b { min-width: 0; flex: 1 1 auto; overflow-wrap: break-word; }
+.jp-location-copy { flex: 1 1 auto; min-width: 0; margin-left: 12rem; }
+.jp-location-copy small, .jp-location-copy b, .jp-location-copy em { display: block; }
+.jp-location-copy b { overflow-wrap: break-word; }
+.jp-location-copy small { color: #9cabc1; font-size: 11rem; }
+.jp-location-copy em { color: #8fa0b8; font-size: 9rem; margin-top: 3rem; }
+.jp-selected-badge { flex: 0 0 auto; margin-left: 8rem; color: #a9d6ff; font-size: 9rem; }
 .jp-from, .jp-to { color: #fff; font-size: 14rem; font-weight: 700; line-height: 1.25; }
 .jp-to-label { margin: 5rem 0; color: #8e9cb0; font-size: 11rem; }
 .jp-leg-meta {
-  display: flex; gap: 12rem; margin-top: 10rem; padding-top: 9rem;
+  display: flex; margin-top: 10rem; padding-top: 9rem;
   border-top: 1rem solid rgba(255,255,255,.10); color: #c3ccdb; font-size: 11rem;
 }
+.jp-leg-meta span + span { margin-left: 12rem; }
 .jp-status { padding: 9rem 16rem 13rem; color: #8fa0b8; font-size: 10rem; line-height: 1.3; }
 
 .jp-panel::-webkit-scrollbar { width: 6rem; }

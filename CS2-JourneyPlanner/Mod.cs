@@ -6,7 +6,7 @@ namespace CS2_JourneyPlanner
 {
     public sealed class Mod : IMod
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.2.0";
 
         public static readonly ILog Log = LogManager
             .GetLogger(nameof(CS2_JourneyPlanner))
@@ -17,6 +17,7 @@ namespace CS2_JourneyPlanner
             Log.Info($"Journey Planner {Version} loading.");
             updateSystem.UpdateAt<JourneyPlannerUISystem>(SystemUpdatePhase.UIUpdate);
             updateSystem.UpdateAt<JourneyPlannerToolSystem>(SystemUpdatePhase.ToolUpdate);
+            updateSystem.UpdateAt<JourneyPlannerRouteSystem>(SystemUpdatePhase.Rendering);
             Log.Info("Journey Planner registered.");
         }
 

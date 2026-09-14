@@ -1,56 +1,31 @@
-# Journey Planner 1.0 release
+# Journey Planner 1.2.0 release
 
-## Before publishing
+The existing Paradox mod is 155518. Publish future updates with the official ModPublisher NewVersion command, not Publish.
 
-1. Test this exact Release build in-game.
-2. Confirm JP opens/closes from the top-right button and ESC.
-3. Confirm citizen selection automatically renders an existing native journey.
-4. Confirm building A -> building B calculates automatically.
-5. Confirm normal CS2 info panels open from the populated Start/Destination rows.
-6. Confirm Hide route, Show route, Delete route and Recalculate journey all work.
-7. Check Player.log for repeated Journey Planner exceptions.
+## Build and reproduce
 
-## Build
+From the repository root, install .NET SDK 10.0.302, the CS2 1.6.0f1 modding toolchain, Node 22.21.0 and npm 10.9.4. The committed npm lockfile is restored automatically. UVM records Game.dll's SHA-256 and the .NET SDK in the receipt.
 
 ```powershell
-dotnet clean .\CS2-JourneyPlanner.csproj
-dotnet build .\CS2-JourneyPlanner.csproj -c Release
+uvm build --package artifacts/package --out artifacts/release.json
 ```
 
-## Publish as a NEW mod
+Here uvm means the CLI from https://vezit.net. The Release recipe includes the managed DLL, Windows native Burst DLL, JavaScript, CSS and JavaScript license file. Release uses the official postprocessor without debug symbols. The package targets the Windows Paradox listing. Debug development builds still use the toolchain's normal native targets.
 
-`Properties\PublishConfiguration.xml` intentionally has an empty ModId.
+UI output follows the isolated deployment directory when UVM builds. The normal dotnet build command deploys locally; close the game first. Do not regenerate or hand-edit the published package after hashing it.
 
-Use the **PublishNewMod** profile:
+## Publication
 
-```powershell
-dotnet publish .\CS2-JourneyPlanner.csproj -p:PublishProfile=Properties\PublishProfiles\PublishNewMod.pubxml
-```
+1. Run the geometry checks and test this exact release in-game.
+2. Commit and push all intended source, configuration, UI lockfile and recipe changes.
+3. Use uvm publish into a new empty package folder to record signed publisher hashes.
+4. Rebuild the exact commit in a separate clean checkout and use uvm verify and uvm attest to record your real result.
+5. Upload the exact package with the official ModPublisher NewVersion command using Properties/PublishConfiguration.xml.
+6. Close the game and rename a local Mods/CS2-JourneyPlanner directory to .CS2-JourneyPlanner before subscribing.
+7. Subscribe to the new version, restart and scan under Options > Unified Verified Mods. Test Journey Planner against the downloaded copy.
 
-Or in Visual Studio:
+The author can self-verify. Another verifier should use their own GitHub account, inspect the source and independently rebuild it. Reproduction is not a security audit.
 
-1. Right-click **CS2-JourneyPlanner**
-2. Choose **Publish**
-3. Select **PublishNewMod**
-4. Publish
-5. Sign in to Paradox Mods if requested
+## Release notes
 
-After the first successful publish, Paradox assigns a ModId.
-
-## IMPORTANT after the first publish
-
-Put the assigned ID into:
-
-```xml
-<ModId Value="YOUR_NEW_MOD_ID" />
-```
-
-Then future releases must use **PublishNewVersion**, not PublishNewMod.
-
-## Included publishing assets
-
-- `Properties\Thumbnail.png`
-- `Properties\Screenshot1.png`
-- `Properties\Screenshot2.png`
-- `Properties\Screenshot3.png`
-- `Properties\PromotionalGuide.png` (optional; not referenced by PublishConfiguration.xml)
+Performance optimized and UVM compatible. Selection uses local spatial searches; cached curves are rendered by a Burst overlay job; citizen-progress updates avoid repeated allocations. Transit lines and journey cards use the player's selected transport colours. No numeric FPS improvement is claimed.

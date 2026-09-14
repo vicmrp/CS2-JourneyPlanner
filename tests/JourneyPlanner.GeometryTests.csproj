@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <GameManagedPath>$([System.Environment]::GetEnvironmentVariable('CSII_MANAGEDPATH', 'EnvironmentVariableTarget.User'))</GameManagedPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../CS2-JourneyPlanner/JourneyGeometry.cs" Link="JourneyGeometry.cs" />
+    <Reference Include="Colossal.Mathematics"><HintPath>$(GameManagedPath)/Colossal.Mathematics.dll</HintPath></Reference>
+    <Reference Include="Unity.Mathematics"><HintPath>$(GameManagedPath)/Unity.Mathematics.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManagedPath)/UnityEngine.CoreModule.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

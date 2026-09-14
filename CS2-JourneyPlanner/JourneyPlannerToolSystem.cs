@@ -1,9 +1,10 @@
 using System;
+using Colossal.Collections;
+using Colossal.Mathematics;
 using Game.Buildings;
 using Game.Common;
 using Game.Creatures;
 using Game.Objects;
-using Unity.Collections;
 using Game.Prefabs;
 using Game.Tools;
 using Unity.Entities;
@@ -16,6 +17,11 @@ namespace CS2_JourneyPlanner
     {
         private JourneyPlannerUISystem _ui;
         private Entity _highlighted = Entity.Null;
+        private Game.Objects.SearchSystem _searchSystem;
+        private Entity _lastHit = Entity.Null;
+        private Entity _hoverEntity = Entity.Null;
+        private float3 _lastHitPosition;
+        private float _nextHoverTime;
 
         public override string toolID => "JourneyPlannerNativeTool";
 
@@ -23,6 +29,7 @@ namespace CS2_JourneyPlanner
         {
             base.OnCreate();
             _ui = World.GetOrCreateSystemManaged<JourneyPlannerUISystem>();
+            _searchSystem = World.GetOrCreateSystemManaged<Game.Objects.SearchSystem>();
         }
 
         protected override void OnStartRunning()
@@ -31,6 +38,7 @@ namespace CS2_JourneyPlanner
             applyAction.shouldBeEnabled = true;
             cancelAction.shouldBeEnabled = true;
             InitializeRaycast();
+            _nextHoverTime = 0f;
         }
 
         protected override void OnStopRunning()
@@ -56,9 +64,14 @@ namespace CS2_JourneyPlanner
         protected override JobHandle OnUpdate(JobHandle inputDeps)
         {
             bool hasResult = GetRaycastResult(out Entity hitEntity, out RaycastHit hit);
+            bool clicked = applyAction.WasPressedThisFrame();
 
             Entity selectable = Entity.Null;
-            if (hasResult)
+            bool refresh = clicked || hitEntity != _lastHit || UnityEngine.Time.realtimeSinceStartup >= _nextHoverTime ||
+                           math.distancesq(hit.m_HitPosition, _lastHitPosition) > 1f;
+            if (hasResult && !refresh && (_hoverEntity == Entity.Null || EntityManager.Exists(_hoverEntity)))
+                selectable = _hoverEntity;
+            else if (hasResult)
             {
                 // When JP is choosing a citizen/start point, citizens get first refusal.
                 // This makes pedestrians selectable even when the native raycast lands on
@@ -77,6 +90,13 @@ namespace CS2_JourneyPlanner
                         : ResolveUsefulEntity(hitEntity, hit.m_HitPosition);
                 }
             }
+            _hoverEntity = selectable;
+            if (refresh)
+            {
+                _lastHit = hitEntity;
+                _lastHitPosition = hit.m_HitPosition;
+                _nextHoverTime = UnityEngine.Time.realtimeSinceStartup + 0.1f;
+            }
 
             // Highlight exactly what the next click will select. For citizens this means
             // the pedestrian receives the game's normal blue hover outline while JP is open.
@@ -84,11 +104,11 @@ namespace CS2_JourneyPlanner
 
             if (cancelAction.WasPressedThisFrame())
             {
-                _ui.CancelSelection();
+                _ui.Close();
                 return inputDeps;
             }
 
-            if (applyAction.WasPressedThisFrame())
+            if (clicked)
             {
                 if (!hasResult || selectable == Entity.Null || !EntityManager.Exists(selectable))
                 {
@@ -127,23 +147,11 @@ namespace CS2_JourneyPlanner
 
         private Entity FindNearestCitizen(float3 hitPosition, float maxDistance)
         {
-            EntityQuery query = GetEntityQuery(ComponentType.ReadOnly<Game.Objects.Transform>());
-            using (NativeArray<Entity> entities = query.ToEntityArray(Allocator.TempJob))
-            using (NativeArray<Game.Objects.Transform> transforms = query.ToComponentDataArray<Game.Objects.Transform>(Allocator.TempJob))
-            {
-                Entity best = Entity.Null;
-                float bestDistanceSq = maxDistance * maxDistance;
-                for (int i = 0; i < entities.Length; i++)
-                {
-                    float distanceSq = math.distancesq(transforms[i].m_Position, hitPosition);
-                    if (distanceSq >= bestDistanceSq) continue;
-                    Entity citizen = ResolveCitizenThroughOwners(entities[i]);
-                    if (citizen == Entity.Null) continue;
-                    bestDistanceSq = distanceSq;
-                    best = citizen;
-                }
-                return best;
-            }
+            var tree = _searchSystem.GetMovingSearchTree(true, out JobHandle dependencies);
+            dependencies.Complete();
+            var iterator = CreateNearbyIterator(hitPosition, maxDistance, true);
+            tree.Iterate(ref iterator);
+            return iterator.Best;
         }
 
         private Entity ResolveUsefulEntity(Entity hit, float3 hitPosition)
@@ -184,25 +192,68 @@ namespace CS2_JourneyPlanner
 
         private Entity FindNearestBuilding(float3 hitPosition, float maxDistance)
         {
-            EntityQuery query = GetEntityQuery(
-                ComponentType.ReadOnly<Building>(),
-                ComponentType.ReadOnly<Game.Objects.Transform>());
+            var tree = _searchSystem.GetStaticSearchTree(true, out JobHandle dependencies);
+            dependencies.Complete();
+            var iterator = CreateNearbyIterator(hitPosition, maxDistance, false);
+            tree.Iterate(ref iterator);
+            return iterator.Best;
+        }
 
-            using (NativeArray<Entity> entities = query.ToEntityArray(Allocator.TempJob))
-            using (NativeArray<Game.Objects.Transform> transforms =
-                   query.ToComponentDataArray<Game.Objects.Transform>(Allocator.TempJob))
+        private NearbyIterator CreateNearbyIterator(float3 position, float radius, bool citizens)
+        {
+            return new NearbyIterator
             {
-                Entity best = Entity.Null;
-                float bestDistanceSq = maxDistance * maxDistance;
-                for (int i = 0; i < entities.Length; i++)
+                Position = position,
+                Bounds = new Bounds2(position.xz - radius, position.xz + radius),
+                BestDistanceSq = radius * radius,
+                Citizens = citizens,
+                Transforms = GetComponentLookup<Game.Objects.Transform>(true),
+                Humans = GetComponentLookup<Human>(true),
+                Residents = GetComponentLookup<Game.Creatures.Resident>(true),
+                Buildings = GetComponentLookup<Building>(true),
+                Owners = GetComponentLookup<Owner>(true),
+                Deleted = GetComponentLookup<Deleted>(true)
+            };
+        }
+
+        // Visit only objects in the small area under the cursor. The game's trees
+        // are already maintained by the simulation; JP never copies a city query.
+        private struct NearbyIterator : INativeQuadTreeIterator<Entity, QuadTreeBoundsXZ>
+        {
+            public float3 Position;
+            public Bounds2 Bounds;
+            public float BestDistanceSq;
+            public bool Citizens;
+            public Entity Best;
+            public ComponentLookup<Game.Objects.Transform> Transforms;
+            public ComponentLookup<Human> Humans;
+            public ComponentLookup<Game.Creatures.Resident> Residents;
+            public ComponentLookup<Building> Buildings;
+            public ComponentLookup<Owner> Owners;
+            public ComponentLookup<Deleted> Deleted;
+
+            public bool Intersect(QuadTreeBoundsXZ bounds) => MathUtils.Intersect(bounds.m_Bounds.xz, Bounds);
+
+            public void Iterate(QuadTreeBoundsXZ bounds, Entity entity)
+            {
+                if (!Intersect(bounds) || Deleted.HasComponent(entity) || !Transforms.HasComponent(entity)) return;
+                float distanceSq = math.distancesq(Transforms[entity].m_Position, Position);
+                if (distanceSq >= BestDistanceSq) return;
+                Entity current = entity;
+                for (int depth = 0; depth < 12 && current != Entity.Null; depth++)
                 {
-                    float distanceSq = math.distancesq(transforms[i].m_Position, hitPosition);
-                    if (distanceSq >= bestDistanceSq)
-                        continue;
-                    bestDistanceSq = distanceSq;
-                    best = entities[i];
+                    if (Deleted.HasComponent(current)) return;
+                    if (Citizens ? Humans.HasComponent(current) || Residents.HasComponent(current) : Buildings.HasComponent(current))
+                    {
+                        Best = current;
+                        BestDistanceSq = distanceSq;
+                        return;
+                    }
+                    if (!Owners.HasComponent(current)) return;
+                    Entity owner = Owners[current].m_Owner;
+                    if (owner == current) return;
+                    current = owner;
                 }
-                return best;
             }
         }
 

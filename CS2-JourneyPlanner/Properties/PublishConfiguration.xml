@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Publish>
-	<ModId Value="155518" />
-
-	<DisplayName Value="Journey Planner" />
-
-	<ShortDescription Value="A small none gameplay chancing tool that help u see how citizens comes around in your city." />
-
-	<LongDescription>
+  <ModId Value="155518" />
+  <DisplayName Value="Journey Planner" />
+  <ShortDescription Value="Plan journeys between buildings or follow a citizen, with optimized rendering and player-selected transit colours." />
+  <LongDescription>
 Just like in real life, when you use public transport in 2026, you typically use a website or an app to plan your journey. In Denmark, we use Rejseplanen.dk (web app). I wanted to create a UI experience that looks and feels similar to this.
 
 The reason I wanted to create this tool was to be able to see what a journey from A to B from a citizens point of view.
@@ -15,28 +12,28 @@ I developed this mod using ChatGPT to help me reverse-engineer how the game's pa
 
 Great news: During my reverse-engineering journey, I discovered that citizens actually do this planning themselves, including planning interchanges! So you can actually click on a citizen and see their full journey.
 
-Bug: v1.0 currently has some issues selecting citizens who are standing close to or inside buildings. I'll try to fix this when I have time.
-	</LongDescription>
+Version 1.2.0 optimizes selection and route rendering and follows the player's transit line colours.
 
-	<Thumbnail Value="Properties/Thumbnail.png" />
+UVM compatible: subscribe to Unified Verified Mods and open Options &gt; Unified Verified Mods to compare this package with signed build evidence at https://vezit.net. The public GitHub repository includes the exact build recipe. A matching build is not a security audit.</LongDescription>
+  <Thumbnail Value="Properties/Thumbnail.png" />
+  <Screenshot Value="Properties/screenshot1.png" />
+  <Screenshot Value="Properties/screenshot2.png" />
+  <Tag Value="" />
+  <ForumLink Value="https://forum.paradoxplaza.com/forum/threads/journey-planner.1938608/" />
+  <ModVersion Value="1.2.0" />
+  <GameVersion Value="1.6.*" />
+  <Dependency Id="" />
+  <RequiredDLC Value="" />
+  <ChangeLog>Performance optimized and UVM compatible.
 
-	<Tag Value="" />
+- Uses local spatial searches for citizen/building selection instead of scanning all positioned objects.
+- Caches route geometry and draws it through the native overlay renderer with a Burst job.
+- Reduces allocations and repeated path processing during citizen progress updates.
+- Transit paths, stop markers and journey cards use the player's saved line colours.
+- Includes a reproducible UVM build recipe covering the C# DLL, native Burst library and UI assets.
+- Signed build evidence can be inspected at vezit.net with Unified Verified Mods.
 
-	<ForumLink Value="https://forum.paradoxplaza.com/forum/threads/journey-planner.1938608/" />
-
-	<ModVersion Value="1.1" />
-
-	<GameVersion Value="1.*" />
-
-	<Dependency Id="" />
-
-	<RequiredDLC Value="" />
-
-	<ChangeLog>
-Fixed issue with 
-	</ChangeLog>
-
-	<ExternalLink Type="github" Url="https://github.com/vicmrp/CS2-JourneyPlanner" />
-
-	<AccessLevel Value="Public" />
+Performance changes reduce avoidable work; no specific FPS improvement is claimed.</ChangeLog>
+  <ExternalLink Type="github" Url="https://github.com/vicmrp/CS2-JourneyPlanner" />
+  <AccessLevel Value="Public" />
 </Publish>

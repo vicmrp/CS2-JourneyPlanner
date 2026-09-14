@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Linq;
 using System.Text;
 using Colossal.UI.Binding;
+using Colossal.Mathematics;
+using Game.Prefabs;
 using Game.Buildings;
 using Game.Common;
 using Game.Creatures;
@@ -31,7 +32,6 @@ namespace CS2_JourneyPlanner
         private const int ComparisonSampleInterval = 30;
         private const int NativeVisualSampleInterval = 30;
         private const int CurveSamples = 14;
-        private const float RouteHeightOffset = 0.65f;
 
         private JourneyPlannerToolSystem _tool;
         private ToolSystem _toolSystem;
@@ -61,8 +61,12 @@ namespace CS2_JourneyPlanner
         private int _nativeVisualChangeNumber;
 
         private bool _routeVisible = true;
-        private GameObject _routeRoot;
-        private Material _routeMaterial;
+        private JourneyPlannerRouteSystem _routeRenderer;
+        private List<JourneyLeg> _journeyLegs;
+        private float _nextColorRefresh;
+        private int _followPointIndex;
+        private float3 _lastFollowPosition;
+        private bool _hasFollowPosition;
 
         // Citizen-origin mode: A is the citizen, B is resolved from Game.Common.Target.
         // The rendered route is progressively consumed behind the citizen/vehicle.
@@ -99,6 +103,7 @@ namespace CS2_JourneyPlanner
         {
             base.OnCreate();
             _tool = World.GetOrCreateSystemManaged<JourneyPlannerToolSystem>();
+            _routeRenderer = World.GetOrCreateSystemManaged<JourneyPlannerRouteSystem>();
             _toolSystem = World.GetOrCreateSystemManaged<ToolSystem>();
             _nameSystem = World.GetOrCreateSystemManaged<NameSystem>();
             _pathfindSetupSystem = World.GetOrCreateSystemManaged<PathfindSetupSystem>();
@@ -181,6 +186,7 @@ namespace CS2_JourneyPlanner
             }
 
             UpdateCitizenRouteProgress();
+            RefreshRouteColors();
 
             if (!_waitingForPath)
                 return;
@@ -197,14 +203,16 @@ namespace CS2_JourneyPlanner
                 DynamicBuffer<PathElement> path = EntityManager.GetBuffer<PathElement>(_probe, true);
                 if (path.Length > 0)
                 {
-                    string result = ParseJourney(path);
+                    List<JourneyLeg> legs = PrepareJourney(path);
+                    string result = ParseJourney(path, legs);
                     _lastPlannerResult = result;
                     _resultBinding.Update(result);
-                    _journeyJsonBinding.Update(BuildJourneyJson(path));
-                    RenderRoute(path);
+                    _journeyJsonBinding.Update(BuildJourneyJson(legs));
+                    RenderRoute(path, legs);
                     _statusBinding.Update("Journey ready.");
                     _waitingForPath = false;
                     _busyBinding.Update(false);
+                    DestroyProbe();
                     return;
                 }
             }
@@ -227,7 +235,7 @@ namespace CS2_JourneyPlanner
                 _statusBinding.Update("Start A is selected. Click a destination building.");
         }
 
-        private void Close()
+        public void Close()
         {
             _isOpen = false;
             _waitingForVanillaInfoClose = false;
@@ -587,73 +595,11 @@ namespace CS2_JourneyPlanner
                 _statusBinding.Update("No citizen is attached to this journey.");
                 return;
             }
-
-            bool selected = false;
-            bool followInvoked = false;
-            try
-            {
-                // First restore the vanilla selected entity. This re-opens/reconnects
-                // CS2's standard info-panel state without a compile-time dependency
-                // on a particular ToolSystem.selected setter.
-                PropertyInfo selectedProp = _toolSystem.GetType().GetProperty(
-                    "selected", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (selectedProp != null && selectedProp.CanWrite)
-                {
-                    selectedProp.SetValue(_toolSystem, citizen, null);
-                    selected = true;
-                }
-
-                // CS2 builds have moved camera/follow helpers between systems. Search
-                // existing managed systems at runtime for a narrowly named follow/focus
-                // method taking one Entity. If none exists, vanilla selection is still
-                // restored and the normal info-panel follow control remains available.
-                PropertyInfo systemsProp = typeof(World).GetProperty(
-                    "Systems", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                object systemsObj = systemsProp != null ? systemsProp.GetValue(World, null) : null;
-                System.Collections.IEnumerable systems = systemsObj as System.Collections.IEnumerable;
-                if (systems != null)
-                {
-                    foreach (object sys in systems)
-                    {
-                        if (sys == null) continue;
-                        string tn = sys.GetType().FullName ?? "";
-                        if (tn.IndexOf("Camera", StringComparison.OrdinalIgnoreCase) < 0 &&
-                            tn.IndexOf("Follow", StringComparison.OrdinalIgnoreCase) < 0)
-                            continue;
-
-                        foreach (MethodInfo m in sys.GetType().GetMethods(
-                                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                        {
-                            string mn = m.Name ?? "";
-                            if (mn.IndexOf("Follow", StringComparison.OrdinalIgnoreCase) < 0 &&
-                                mn.IndexOf("Focus", StringComparison.OrdinalIgnoreCase) < 0)
-                                continue;
-                            ParameterInfo[] ps = m.GetParameters();
-                            if (ps.Length == 1 && ps[0].ParameterType == typeof(Entity))
-                            {
-                                try
-                                {
-                                    m.Invoke(sys, new object[] { citizen });
-                                    followInvoked = true;
-                                    break;
-                                }
-                                catch { }
-                            }
-                        }
-                        if (followInvoked) break;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Mod.Log.Warn("Re-follow best-effort call failed: " + ex.GetBaseException().Message);
-            }
-
-            _statusBinding.Update(followInvoked
-                ? "Re-followed citizen using the native camera/follow system."
-                : selected
-                    ? "Citizen re-selected in the vanilla UI. If your build does not expose the follow method, use the vanilla follow icon once."
-                    : "Could not invoke the native follow control on this CS2 build.");
+            // Use the same public focus entry point as the game's selected-entity
+            // panel. Keep its selection handoff active until that panel is closed.
+            ShowVanillaInfo(citizen, "citizen");
+            World.GetOrCreateSystemManaged<Game.UI.InGame.SelectedInfoUISystem>().Focus(citizen);
+            _statusBinding.Update("Following the selected citizen with the native CS2 camera.");
         }
 
         private bool TryUseCitizenNativeJourney()
@@ -683,11 +629,12 @@ namespace CS2_JourneyPlanner
             }
 
             _activeRequestMode = "CitizenActual";
-            string result = ParseJourney(path);
+            List<JourneyLeg> legs = PrepareJourney(path);
+            string result = ParseJourney(path, legs);
             _lastPlannerResult = result;
             _resultBinding.Update(result);
-            _journeyJsonBinding.Update(BuildJourneyJson(path));
-            RenderRoute(path);
+            _journeyJsonBinding.Update(BuildJourneyJson(legs));
+            RenderRoute(path, legs);
             _busyBinding.Update(false);
             _waitingForPath = false;
             _statusBinding.Update("Using the selected citizen's own native path (" + path.Length +
@@ -804,10 +751,10 @@ namespace CS2_JourneyPlanner
             float total = 0f;
             for (int i = leg.StartPathIndex; i <= leg.EndPathIndex && i < path.Length; i++)
             {
-                if (!TryGetCurvePoints(path[i].m_Target, out Vector3[] points) || points == null)
+                if (!TryGetBezier(path[i].m_Target, out Bezier4x3 source) ||
+                    !JourneyGeometry.TryTrim(source, path[i].m_TargetDelta, out Bezier4x3 curve))
                     continue;
-                for (int n = 1; n < points.Length; n++)
-                    total += Vector3.Distance(points[n - 1], points[n]);
+                total += JourneyGeometry.Length(curve, CurveSamples);
             }
             return total;
         }
@@ -829,9 +776,8 @@ namespace CS2_JourneyPlanner
                         .Replace("\t", "\\t");
         }
 
-        private string BuildJourneyJson(DynamicBuffer<PathElement> path)
+        private string BuildJourneyJson(List<JourneyLeg> legs)
         {
-            List<JourneyLeg> legs = BuildLegs(path);
             StringBuilder b = new StringBuilder();
             b.Append("{\"ready\":true");
             b.Append(",\"citizen\":").Append(_citizenOriginMode ? "true" : "false");
@@ -843,9 +789,7 @@ namespace CS2_JourneyPlanner
             {
                 if (i > 0) b.Append(',');
                 JourneyLeg leg = legs[i];
-                float distance = (leg.Mode == "Walk" || IsPrivateMode(leg.Mode))
-                    ? CalculateLegDistance(path, leg)
-                    : 0f;
+                float distance = leg.DistanceMeters;
                 int walkMinutes = leg.Mode == "Walk" ? EstimateWalkMinutes(distance) : 0;
                 int stops = (!IsPrivateMode(leg.Mode) && leg.Mode != "Walk")
                     ? EstimateStopCount(leg.RouteOwner, leg.FirstWaypoint, leg.LastWaypoint)
@@ -861,6 +805,8 @@ namespace CS2_JourneyPlanner
                 b.Append('{');
                 b.Append("\"mode\":\"").Append(JsonEscape(leg.Mode)).Append("\"");
                 b.Append(",\"routeNumber\":").Append(leg.RouteNumber);
+                b.Append(",\"color\":\"").Append(leg.ColorHex).Append("\"");
+                b.Append(",\"routeName\":\"").Append(JsonEscape(leg.RouteName)).Append("\"");
                 b.Append(",\"from\":\"").Append(JsonEscape(from)).Append("\"");
                 b.Append(",\"to\":\"").Append(JsonEscape(to)).Append("\"");
                 b.Append(",\"distanceMeters\":").Append(distance.ToString("0.0", CultureInfo.InvariantCulture));
@@ -873,9 +819,8 @@ namespace CS2_JourneyPlanner
             return b.ToString();
         }
 
-        private string ParseJourney(DynamicBuffer<PathElement> path)
+        private string ParseJourney(DynamicBuffer<PathElement> path, List<JourneyLeg> legs)
         {
-            List<JourneyLeg> legs = BuildLegs(path);
 
             // Suppress tiny connector-only walk runs at the very beginning/end only
             // if they contain zero elements (normally impossible). Keep all real runs
@@ -952,21 +897,39 @@ namespace CS2_JourneyPlanner
             if (target == Entity.Null || !EntityManager.Exists(target))
                 return info;
 
-            string name = ResolveName(target);
-            string lower = name.ToLowerInvariant();
-            if (lower.Contains("bus line")) info.Mode = "Bus";
-            else if (lower.Contains("tram line")) info.Mode = "Tram";
-            else if (lower.Contains("passenger railway") || lower.Contains("train line")) info.Mode = "Train";
-            else if (lower.Contains("metro line") || lower.Contains("subway line")) info.Mode = "Metro";
-            else if (lower.Contains("ship line") || lower.Contains("ferry line")) info.Mode = "Ship";
-            else if (lower.Contains("airplane line") || lower.Contains("air line")) info.Mode = "Air";
-            else return info;
-
+            // Names are player-editable and localized. Use the route prefab's
+            // transport type so renamed lines retain their identity and colour.
+            bool isWaypoint = EntityManager.HasComponent<Waypoint>(target);
+            bool isSegment = EntityManager.HasComponent<Game.Routes.Segment>(target);
+            if ((!isWaypoint && !isSegment) || !EntityManager.HasComponent<Owner>(target)) return info;
+            Entity route = EntityManager.GetComponentData<Owner>(target).m_Owner;
+            if (route == Entity.Null || !EntityManager.Exists(route) || !EntityManager.HasComponent<PrefabRef>(route)) return info;
+            Entity prefab = EntityManager.GetComponentData<PrefabRef>(route).m_Prefab;
+            if (!EntityManager.Exists(prefab) || !EntityManager.HasComponent<TransportLineData>(prefab)) return info;
+            switch (EntityManager.GetComponentData<TransportLineData>(prefab).m_TransportType)
+            {
+                case TransportType.Bus: info.Mode = "Bus"; break;
+                case TransportType.Tram: info.Mode = "Tram"; break;
+                case TransportType.Train: info.Mode = "Train"; break;
+                case TransportType.Subway: info.Mode = "Metro"; break;
+                case TransportType.Ferry:
+                case TransportType.Ship: info.Mode = "Ship"; break;
+                case TransportType.Airplane: info.Mode = "Air"; break;
+                default: return info;
+            }
             info.IsTransit = true;
-            if (EntityManager.HasComponent<Owner>(target))
-                info.RouteOwner = EntityManager.GetComponentData<Owner>(target).m_Owner;
-            if (EntityManager.HasComponent<Waypoint>(target))
+            info.RouteOwner = route;
+            if (isWaypoint)
+            {
                 info.WaypointIndex = EntityManager.GetComponentData<Waypoint>(target).m_Index;
+                info.ExitWaypointIndex = info.WaypointIndex;
+            }
+            else
+            {
+                info.WaypointIndex = EntityManager.GetComponentData<Game.Routes.Segment>(target).m_Index;
+                int count = EntityManager.HasBuffer<RouteWaypoint>(route) ? EntityManager.GetBuffer<RouteWaypoint>(route, true).Length : 0;
+                info.ExitWaypointIndex = count > 0 ? (info.WaypointIndex + 1) % count : -1;
+            }
             if (info.RouteOwner != Entity.Null && EntityManager.Exists(info.RouteOwner) && EntityManager.HasComponent<RouteNumber>(info.RouteOwner))
                 info.RouteNumber = EntityManager.GetComponentData<RouteNumber>(info.RouteOwner).m_Number;
 
@@ -1312,8 +1275,7 @@ namespace CS2_JourneyPlanner
         {
             _routeVisible = !_routeVisible;
             _routeVisibleBinding.Update(_routeVisible);
-            if (_routeRoot != null)
-                _routeRoot.SetActive(_routeVisible);
+            _routeRenderer.Visible = _routeVisible;
         }
 
         private void DeleteRoute()
@@ -1469,135 +1431,151 @@ namespace CS2_JourneyPlanner
             WriteTextSafe(Path.Combine(_comparisonFolder, "planner-proposed.txt"), b.ToString());
         }
 
-        private void RenderRoute(DynamicBuffer<PathElement> path)
+        private List<JourneyLeg> PrepareJourney(DynamicBuffer<PathElement> path)
         {
-            DestroyRouteOverlay();
-            EnsureRouteMaterial();
-            if (_routeMaterial == null)
-            {
-                _statusBinding.Update("Journey calculated, but no compatible Unity line shader was found for visualization.");
-                return;
-            }
-
-            _routeRoot = new GameObject("JourneyPlanner.NativeRoute");
-            _routePieces.Clear();
-            _followPieceIndex = 0;
-            _followFrame = 0;
-
-            int walkCurves = 0;
-            int transitCurves = 0;
             List<JourneyLeg> legs = BuildLegs(path);
-
-            var discovery = new StringBuilder();
-
-            // Render legs in actual journey order. This is important for citizen-follow
-            // mode because route pieces can then be consumed sequentially behind A.
             foreach (JourneyLeg leg in legs)
             {
+                leg.DistanceMeters = leg.Mode == "Walk" || IsPrivateMode(leg.Mode) ? CalculateLegDistance(path, leg) : 0f;
+                leg.RenderColor = GetLegColor(leg);
+                leg.ColorHex = ColorHex(leg.RenderColor);
+                leg.RouteName = GetRouteDisplayName(leg);
+            }
+            return legs;
+        }
+
+        private void RenderRoute(DynamicBuffer<PathElement> path, List<JourneyLeg> legs)
+        {
+            DestroyRouteOverlay();
+            _journeyLegs = legs;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            for (int n = 0; n < legs.Count; n++)
+            {
+                JourneyLeg leg = legs[n];
                 if (leg.Mode == "Walk" || IsPrivateMode(leg.Mode))
                 {
-                    float width = leg.Mode == "Walk" ? 2.2f : 3.4f;
                     for (int i = leg.StartPathIndex; i <= leg.EndPathIndex && i < path.Length; i++)
-                    {
-                        if (TryGetCurvePoints(path[i].m_Target, out Vector3[] points))
-                        {
-                            CreateLine(leg.Mode + ".PathElement." + i, points, width, GetModeColor(leg.Mode), leg.StartPathIndex, leg.EndPathIndex);
-                            walkCurves++;
-                        }
-                    }
+                        AddRouteElement(path[i], leg, n, i, i);
                 }
                 else
                 {
-                    transitCurves += RenderTransitLegFromRouteSegments(leg, discovery);
+                    RenderTransitLeg(leg, n);
                 }
             }
-
-            _routeRoot.SetActive(_routeVisible);
-            if (_followCitizen != Entity.Null && EntityManager.Exists(_followCitizen))
-                _statusBinding.Update("Journey ready. Route progress will follow the selected citizen.");
-            else
-                _statusBinding.Update("Journey ready.");
+            _routeRenderer.Visible = _routeVisible;
+            Mod.Log.Info("Route overlay cached: " + _routePieces.Count + " curves, " + legs.Count +
+                         " legs in " + timer.Elapsed.TotalMilliseconds.ToString("0.0", CultureInfo.InvariantCulture) + " ms.");
         }
 
-        private int RenderTransitLegFromRouteSegments(JourneyLeg leg, StringBuilder log)
+        private void RenderTransitLeg(JourneyLeg leg, int legIndex)
         {
-            log.AppendLine();
-            log.AppendLine(leg.Mode.ToUpperInvariant() + " " + (leg.RouteNumber >= 0 ? leg.RouteNumber.ToString(CultureInfo.InvariantCulture) : "?") +
-                           " route=" + FormatEntity(leg.RouteOwner) + " waypoint " + leg.FirstWaypoint + " -> " + leg.LastWaypoint);
-
-            if (leg.RouteOwner == Entity.Null || !EntityManager.Exists(leg.RouteOwner))
+            Entity route = leg.RouteOwner;
+            if (route == Entity.Null || !EntityManager.Exists(route) ||
+                !EntityManager.HasBuffer<RouteSegment>(route) || !EntityManager.HasBuffer<RouteWaypoint>(route)) return;
+            var segments = EntityManager.GetBuffer<RouteSegment>(route, true);
+            var waypoints = EntityManager.GetBuffer<RouteWaypoint>(route, true);
+            if (segments.Length == 0 || waypoints.Length == 0 || leg.FirstWaypoint < 0 || leg.LastWaypoint < 0) return;
+            int first = leg.FirstWaypoint % waypoints.Length;
+            int last = leg.LastWaypoint % waypoints.Length;
+            if (first == last) return; // Boarding and alighting here does not mean a full route loop.
+            UnityEngine.Color color = leg.RenderColor;
+            for (int hop = 0, current = first; hop < waypoints.Length && current != last; hop++)
             {
-                log.AppendLine("  Route owner missing.");
-                return 0;
-            }
-            if (!EntityManager.HasBuffer<RouteSegment>(leg.RouteOwner) || !EntityManager.HasBuffer<RouteWaypoint>(leg.RouteOwner))
-            {
-                log.AppendLine("  RouteSegment/RouteWaypoint buffer missing.");
-                return 0;
-            }
-
-            DynamicBuffer<RouteSegment> segments = EntityManager.GetBuffer<RouteSegment>(leg.RouteOwner, true);
-            DynamicBuffer<RouteWaypoint> waypoints = EntityManager.GetBuffer<RouteWaypoint>(leg.RouteOwner, true);
-            log.AppendLine("  RouteWaypoint.Length=" + waypoints.Length + " RouteSegment.Length=" + segments.Length);
-            if (segments.Length == 0 || waypoints.Length == 0 || leg.FirstWaypoint < 0 || leg.LastWaypoint < 0)
-                return 0;
-
-            int current = leg.FirstWaypoint % segments.Length;
-            if (current < 0) current += segments.Length;
-            int safety = 0;
-            int rendered = 0;
-            while (safety++ < segments.Length + 1)
-            {
+                if (current >= segments.Length) break;
+                AddStopMarker(waypoints[current].m_Waypoint, color, legIndex, _routePieces.Count);
                 Entity segment = segments[current].m_Segment;
-                log.AppendLine("  segment[" + current + "]=" + DescribeEntity(segment));
-                rendered += RenderRouteSegmentPath(segment, leg.Mode, log, current, leg.StartPathIndex, leg.EndPathIndex);
-
-                int nextWaypoint = (current + 1) % waypoints.Length;
-                if (nextWaypoint == leg.LastWaypoint)
-                    break;
-                current = (current + 1) % segments.Length;
+                if (EntityManager.Exists(segment))
+                {
+                    bool hasGeometry = false;
+                    if (EntityManager.HasBuffer<PathElement>(segment))
+                    {
+                        var segmentPath = EntityManager.GetBuffer<PathElement>(segment, true);
+                        for (int i = 0; i < segmentPath.Length; i++)
+                            hasGeometry |= AddRouteElement(segmentPath[i], leg, legIndex, leg.StartPathIndex, leg.EndPathIndex);
+                    }
+                    // The segment curve is only a fallback, never a duplicate of its lane path.
+                    if (!hasGeometry && TryGetBezier(segment, out Bezier4x3 curve))
+                        AddRouteCurve(curve, leg, legIndex, leg.StartPathIndex, leg.EndPathIndex);
+                }
+                current = (current + 1) % waypoints.Length;
             }
-            log.AppendLine("  rendered lane curves=" + rendered);
-            return rendered;
+            AddStopMarker(waypoints[last].m_Waypoint, color, legIndex, _routePieces.Count);
         }
 
-        private int RenderRouteSegmentPath(Entity segment, string mode, StringBuilder log, int segmentIndex, int journeyStartIndex, int journeyEndIndex)
+        private bool AddRouteElement(PathElement element, JourneyLeg leg, int legIndex, int start, int end)
         {
-            if (segment == Entity.Null || !EntityManager.Exists(segment)) return 0;
-            int rendered = 0;
+            if (!TryGetBezier(element.m_Target, out Bezier4x3 curve)) return false;
+            // TargetDelta is the native traversal interval, including reversed and partial lanes.
+            if (!JourneyGeometry.TryTrim(curve, element.m_TargetDelta, out curve)) return false;
+            AddRouteCurve(curve, leg, legIndex, start, end);
+            return true;
+        }
 
-            if (TryGetCurvePoints(segment, out Vector3[] ownCurve))
+        private void AddRouteCurve(Bezier4x3 curve, JourneyLeg leg, int legIndex, int start, int end)
+        {
+            _routeRenderer.AddCurve(new JourneyPlannerRouteSystem.RouteCurve
             {
-                CreateLine("Transit." + mode + ".Segment." + segmentIndex, ownCurve, 4.0f, GetModeColor(mode), journeyStartIndex, journeyEndIndex);
-                rendered++;
-            }
+                Curve = curve, Color = leg.RenderColor, LegIndex = legIndex,
+                Width = leg.Mode == "Walk" ? 2.2f : 4f
+            });
+            _routePieces.Add(new RoutePiece { Curve = curve, JourneyStartIndex = start, JourneyEndIndex = end });
+        }
 
-            if (EntityManager.HasBuffer<PathElement>(segment))
+        private void AddStopMarker(Entity waypoint, UnityEngine.Color color, int legIndex, int curveIndex)
+        {
+            Entity target = waypoint;
+            if (EntityManager.Exists(waypoint) && EntityManager.HasComponent<Connected>(waypoint))
+                target = EntityManager.GetComponentData<Connected>(waypoint).m_Connected;
+            if (!TryGetWorldPosition(target, out float3 position) && !TryGetWorldPosition(waypoint, out position)) return;
+            _routeRenderer.AddStop(new JourneyPlannerRouteSystem.StopMarker
+            { Position = position, Color = color, LegIndex = legIndex, CurveIndex = curveIndex });
+        }
+
+        private UnityEngine.Color GetLegColor(JourneyLeg leg)
+        {
+            if (leg.RouteOwner != Entity.Null && EntityManager.Exists(leg.RouteOwner) &&
+                EntityManager.HasComponent<Game.Routes.Color>(leg.RouteOwner))
             {
-                DynamicBuffer<PathElement> path = EntityManager.GetBuffer<PathElement>(segment, true);
-                log.AppendLine("    PathElement.Length=" + path.Length);
-                for (int i = 0; i < path.Length; i++)
-                {
-                    Entity target = path[i].m_Target;
-                    log.AppendLine("      [" + i + "] " + DescribeEntity(target) + " delta=" + path[i].m_TargetDelta);
-                    if (TryGetCurvePoints(target, out Vector3[] points))
-                    {
-                        CreateLine("Transit." + mode + "." + segmentIndex + ".Path." + i, points, 4.0f, GetModeColor(mode), journeyStartIndex, journeyEndIndex);
-                        rendered++;
-                    }
-                }
+                UnityEngine.Color color = EntityManager.GetComponentData<Game.Routes.Color>(leg.RouteOwner).m_Color;
+                color.a = 1f;
+                return color;
             }
-            else
+            return GetModeColor(leg.Mode);
+        }
+
+        private static string ColorHex(UnityEngine.Color color)
+        {
+            Color32 bytes = color;
+            return String.Format(CultureInfo.InvariantCulture, "#{0:X2}{1:X2}{2:X2}", bytes.r, bytes.g, bytes.b);
+        }
+
+        private string GetRouteDisplayName(JourneyLeg leg)
+        {
+            if (leg.RouteOwner == Entity.Null || !EntityManager.Exists(leg.RouteOwner)) return "";
+            if (_nameSystem.TryGetCustomName(leg.RouteOwner, out string custom) && !String.IsNullOrWhiteSpace(custom)) return custom;
+            return leg.Mode + " Line" + (leg.RouteNumber >= 0 ? " " + leg.RouteNumber : "");
+        }
+
+        private void RefreshRouteColors()
+        {
+            if (_waitingForPath || _journeyLegs == null || (!_isOpen && !_routeVisible) || UnityEngine.Time.realtimeSinceStartup < _nextColorRefresh) return;
+            _nextColorRefresh = UnityEngine.Time.realtimeSinceStartup + 1f;
+            bool changed = false;
+            for (int i = 0; i < _journeyLegs.Count; i++)
             {
-                log.AppendLine("    PathElement buffer absent.");
+                JourneyLeg leg = _journeyLegs[i];
+                if (leg.RouteOwner == Entity.Null) continue;
+                UnityEngine.Color color = GetLegColor(leg);
+                string hex = ColorHex(color);
+                string name = GetRouteDisplayName(leg);
+                if (hex == leg.ColorHex && name == leg.RouteName) continue;
+                leg.ColorHex = hex;
+                leg.RenderColor = color;
+                leg.RouteName = name;
+                _routeRenderer.SetLegColor(i, color);
+                changed = true;
             }
-
-            if (EntityManager.HasBuffer<CurveSource>(segment))
-                log.AppendLine("    CurveSource.Length=" + EntityManager.GetBuffer<CurveSource>(segment, true).Length);
-            if (EntityManager.HasBuffer<CurveElement>(segment))
-                log.AppendLine("    CurveElement.Length=" + EntityManager.GetBuffer<CurveElement>(segment, true).Length);
-
-            return rendered;
+            if (changed) _journeyJsonBinding.Update(BuildJourneyJson(_journeyLegs));
         }
 
         private List<JourneyLeg> BuildLegs(DynamicBuffer<PathElement> path)
@@ -1619,6 +1597,7 @@ namespace CS2_JourneyPlanner
                 Entity routeOwner = Entity.Null;
                 int routeNumber = -1;
                 int waypoint = -1;
+                int exitWaypoint = -1;
 
                 if (transit.IsTransit)
                 {
@@ -1627,6 +1606,7 @@ namespace CS2_JourneyPlanner
                     routeOwner = transit.RouteOwner;
                     routeNumber = transit.RouteNumber;
                     waypoint = transit.WaypointIndex;
+                    exitWaypoint = transit.ExitWaypointIndex;
                     key = mode + ":" + routeOwner.Index + ":" + routeOwner.Version;
                 }
                 else
@@ -1673,7 +1653,7 @@ namespace CS2_JourneyPlanner
                     {
                         Key = key, Mode = mode, RouteOwner = routeOwner,
                         StartPathIndex = i, EndPathIndex = i, FirstTarget = target, LastTarget = target,
-                        RouteNumber = routeNumber, FirstWaypoint = waypoint, LastWaypoint = waypoint
+                        RouteNumber = routeNumber, FirstWaypoint = waypoint, LastWaypoint = exitWaypoint
                     };
                     legs.Add(current);
                 }
@@ -1681,7 +1661,7 @@ namespace CS2_JourneyPlanner
                 {
                     current.EndPathIndex = i;
                     current.LastTarget = target;
-                    if (waypoint >= 0) current.LastWaypoint = waypoint;
+                    if (exitWaypoint >= 0) current.LastWaypoint = exitWaypoint;
                 }
             }
             return legs;
@@ -1714,56 +1694,11 @@ namespace CS2_JourneyPlanner
                    lower.Contains("invisible car");
         }
 
-        private void EnsureRouteMaterial()
-        {
-            if (_routeMaterial != null) return;
-            string[] names = { "HDRP/Unlit", "Shader Graphs/Unlit", "Universal Render Pipeline/Unlit", "Sprites/Default", "Unlit/Color" };
-            foreach (string name in names)
-            {
-                Shader shader = Shader.Find(name);
-                if (shader == null) continue;
-                _routeMaterial = new Material(shader);
-                _routeMaterial.name = "JourneyPlanner.NativeRouteMaterial";
-                break;
-            }
-        }
-
-        private void CreateLine(string name, Vector3[] points, float width, UnityEngine.Color color, int journeyStartIndex, int journeyEndIndex)
-        {
-            if (points == null || points.Length < 2 || _routeRoot == null) return;
-            GameObject obj = new GameObject(name);
-            obj.transform.SetParent(_routeRoot.transform, false);
-            LineRenderer line = obj.AddComponent<LineRenderer>();
-            line.useWorldSpace = true;
-            line.loop = false;
-            line.positionCount = points.Length;
-            line.startWidth = width;
-            line.endWidth = width;
-            line.numCapVertices = 4;
-            line.numCornerVertices = 3;
-            line.receiveShadows = false;
-            line.material = new Material(_routeMaterial);
-            line.startColor = color;
-            line.endColor = color;
-            line.material.color = color;
-            if (line.material.HasProperty("_BaseColor")) line.material.SetColor("_BaseColor", color);
-            if (line.material.HasProperty("_EmissiveColor")) line.material.SetColor("_EmissiveColor", color * 1.5f);
-            line.SetPositions(points);
-
-            _routePieces.Add(new RoutePiece
-            {
-                Object = obj,
-                Line = line,
-                OriginalPoints = (Vector3[])points.Clone(),
-                JourneyStartIndex = journeyStartIndex,
-                JourneyEndIndex = journeyEndIndex
-            });
-        }
-
         private UnityEngine.Color GetModeColor(string mode)
         {
             switch ((mode ?? "").ToLowerInvariant())
             {
+                case "walk": return new UnityEngine.Color(0.65f, 0.70f, 0.78f, 1f);
                 case "bus": return new UnityEngine.Color(0.15f, 0.65f, 1f, 1f);
                 case "tram": return new UnityEngine.Color(0.25f, 0.9f, 0.45f, 1f);
                 case "metro": return new UnityEngine.Color(0.75f, 0.35f, 1f, 1f);
@@ -1775,45 +1710,12 @@ namespace CS2_JourneyPlanner
             }
         }
 
-        private bool TryGetCurvePoints(Entity entity, out Vector3[] points)
+        private bool TryGetBezier(Entity entity, out Bezier4x3 curve)
         {
-            points = null;
-            if (entity == Entity.Null || !EntityManager.Exists(entity) || !EntityManager.HasComponent<Game.Net.Curve>(entity))
-                return false;
-            try
-            {
-                Game.Net.Curve curve = EntityManager.GetComponentData<Game.Net.Curve>(entity);
-                object boxed = curve;
-                FieldInfo bezierField = boxed.GetType().GetField("m_Bezier", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (bezierField == null) return false;
-                object bezier = bezierField.GetValue(boxed);
-                if (!TryReadFloat3(bezier, "a", "m_A", out float3 a) ||
-                    !TryReadFloat3(bezier, "b", "m_B", out float3 b) ||
-                    !TryReadFloat3(bezier, "c", "m_C", out float3 c) ||
-                    !TryReadFloat3(bezier, "d", "m_D", out float3 d)) return false;
-                points = new Vector3[CurveSamples + 1];
-                for (int i = 0; i <= CurveSamples; i++)
-                {
-                    float t = i / (float)CurveSamples;
-                    float u = 1f - t;
-                    float3 pos = u*u*u*a + 3f*u*u*t*b + 3f*u*t*t*c + t*t*t*d;
-                    points[i] = new Vector3(pos.x, pos.y + RouteHeightOffset, pos.z);
-                }
-                return true;
-            }
-            catch { return false; }
-        }
-
-        private static bool TryReadFloat3(object obj, string field1, string field2, out float3 value)
-        {
-            value = float3.zero;
-            if (obj == null) return false;
-            FieldInfo f = obj.GetType().GetField(field1, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) ??
-                          obj.GetType().GetField(field2, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (f == null) return false;
-            object raw = f.GetValue(obj);
-            if (raw is float3 p) { value = p; return true; }
-            return false;
+            curve = default;
+            if (entity == Entity.Null || !EntityManager.Exists(entity) || !EntityManager.HasComponent<Game.Net.Curve>(entity)) return false;
+            curve = EntityManager.GetComponentData<Game.Net.Curve>(entity).m_Bezier;
+            return true;
         }
 
         private bool TryGetWorldPosition(Entity entity, out float3 position)
@@ -1826,6 +1728,11 @@ namespace CS2_JourneyPlanner
                 if (EntityManager.HasComponent<Game.Objects.Transform>(current))
                 {
                     position = EntityManager.GetComponentData<Game.Objects.Transform>(current).m_Position;
+                    return true;
+                }
+                if (EntityManager.HasComponent<Game.Routes.Position>(current))
+                {
+                    position = EntityManager.GetComponentData<Game.Routes.Position>(current).m_Position;
                     return true;
                 }
                 if (EntityManager.HasComponent<Connected>(current))
@@ -1903,108 +1810,62 @@ namespace CS2_JourneyPlanner
 
         private void UpdateCitizenRouteProgress()
         {
-            if (_followCitizen == Entity.Null || _routeRoot == null || _routePieces.Count == 0 || !_routeVisible)
-                return;
-            if (!EntityManager.Exists(_followCitizen))
-            {
-                _followCitizen = Entity.Null;
-                return;
-            }
+            if (_followCitizen == Entity.Null || _routePieces.Count == 0 || !_routeVisible || _followPieceIndex >= _routePieces.Count) return;
+            if (!EntityManager.Exists(_followCitizen)) { _followCitizen = Entity.Null; return; }
             if (++_followFrame < FollowUpdateInterval) return;
             _followFrame = 0;
-
             if (!TryGetFollowerPosition(_followCitizen, out float3 world)) return;
-            Vector3 follower = new Vector3(world.x, world.y + RouteHeightOffset, world.z);
-
-            int bestPiece = -1;
-            int bestPoint = -1;
+            if (_hasFollowPosition && math.distancesq(world, _lastFollowPosition) < 0.04f) return;
+            _hasFollowPosition = true;
+            _lastFollowPosition = world;
+            int bestPiece = -1, bestPoint = -1;
             float bestDistanceSq = FollowAcquireDistance * FollowAcquireDistance;
-
-            // Progress is monotonic. Search forward from the current piece so a route
-            // crossing cannot make the line jump backwards.
             for (int p = _followPieceIndex; p < _routePieces.Count; p++)
             {
                 RoutePiece piece = _routePieces[p];
-                Vector3[] pts = piece.OriginalPoints;
-                for (int i = 0; i < pts.Length; i++)
+                for (int i = p == _followPieceIndex ? _followPointIndex : 0; i <= CurveSamples; i++)
                 {
-                    float dx = pts[i].x - follower.x;
-                    float dz = pts[i].z - follower.z;
-                    float d2 = dx * dx + dz * dz;
-                    if (d2 < bestDistanceSq)
+                    float3 point = MathUtils.Position(piece.Curve, i / (float)CurveSamples);
+                    float distanceSq = math.distancesq(point.xz, world.xz);
+                    if (distanceSq < bestDistanceSq)
                     {
-                        bestDistanceSq = d2;
+                        bestDistanceSq = distanceSq;
                         bestPiece = p;
                         bestPoint = i;
                     }
                 }
-
-                // Prefer the earliest route piece once we have a close hit. This
-                // prevents nearby parallel bus/rail lanes from skipping far ahead.
-                if (bestPiece == p && bestDistanceSq < 18f * 18f)
-                    break;
+                if (bestPiece == p && bestDistanceSq < 18f * 18f) break;
             }
-
-            if (bestPiece < 0) return; // Off the proposed route: do not fake progress.
-
-            for (int p = _followPieceIndex; p < bestPiece; p++)
-                if (_routePieces[p].Object != null) _routePieces[p].Object.SetActive(false);
-
-            _followPieceIndex = Math.Max(_followPieceIndex, bestPiece);
-            RoutePiece current = _routePieces[_followPieceIndex];
-            if (current.Object == null || current.Line == null || bestPoint < 0) return;
-            current.Object.SetActive(true);
-
-            // Keep the exact nearest point as the new beginning, then all remaining
-            // original samples. The line therefore visually ends at the citizen and
-            // disappears behind them as they/vehicle advance.
-            int remaining = current.OriginalPoints.Length - bestPoint;
-            if (remaining < 2)
+            if (bestPiece < 0) return;
+            _followPieceIndex = bestPiece;
+            _followPointIndex = bestPoint;
+            if (_followPointIndex >= CurveSamples)
             {
-                current.Object.SetActive(false);
-                if (_followPieceIndex + 1 < _routePieces.Count) _followPieceIndex++;
-                return;
+                _followPieceIndex++;
+                _followPointIndex = 0;
             }
-            Vector3[] tail = new Vector3[remaining];
-            Array.Copy(current.OriginalPoints, bestPoint, tail, 0, remaining);
-            tail[0] = follower;
-            current.Line.positionCount = tail.Length;
-            current.Line.SetPositions(tail);
+            _routeRenderer.SetProgress(_followPieceIndex, _followPointIndex / (float)CurveSamples);
         }
 
         private bool TryGetFollowerPosition(Entity citizen, out float3 position)
         {
-            position = float3.zero;
-
-            // While riding public transport, follow the vehicle rather than the
-            // passenger entity. Reflection avoids depending on a specific field name
-            // across CS2 builds while still using the native CurrentVehicle component.
             if (EntityManager.HasComponent<CurrentVehicle>(citizen))
             {
-                try
-                {
-                    object boxed = EntityManager.GetComponentData<CurrentVehicle>(citizen);
-                    FieldInfo f = boxed.GetType().GetField("m_Vehicle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (f != null && f.GetValue(boxed) is Entity vehicle && vehicle != Entity.Null && EntityManager.Exists(vehicle))
-                    {
-                        if (TryGetWorldPosition(vehicle, out position)) return true;
-                    }
-                }
-                catch { }
+                Entity vehicle = EntityManager.GetComponentData<CurrentVehicle>(citizen).m_Vehicle;
+                if (vehicle != Entity.Null && EntityManager.Exists(vehicle) && TryGetWorldPosition(vehicle, out position)) return true;
             }
-
             return TryGetWorldPosition(citizen, out position);
         }
 
         private void DestroyRouteOverlay()
         {
-            if (_routeRoot != null)
-            {
-                UnityEngine.Object.Destroy(_routeRoot);
-                _routeRoot = null;
-            }
+            _routeRenderer?.ClearRoute();
             _routePieces.Clear();
+            _journeyLegs = null;
             _followPieceIndex = 0;
+            _followPointIndex = 0;
+            _followFrame = 0;
+            _hasFollowPosition = false;
         }
 
         private static string Csv(string value)
@@ -2031,6 +1892,9 @@ namespace CS2_JourneyPlanner
             _busyBinding.Update(false);
             _statusBinding.Update(message);
             _resultBinding.Update(message);
+            _journeyJsonBinding.Update("{\"ready\":false}");
+            DestroyProbe();
+            DestroyRouteOverlay();
         }
 
         private void Clear()
@@ -2061,6 +1925,8 @@ namespace CS2_JourneyPlanner
 
         private void DestroyProbe()
         {
+            _waitingForPath = false;
+            _busyBinding?.Update(false);
             if (_probe != Entity.Null && EntityManager.Exists(_probe))
             {
                 try { EntityManager.DestroyEntity(_probe); }
@@ -2073,11 +1939,6 @@ namespace CS2_JourneyPlanner
         {
             DestroyProbe();
             DestroyRouteOverlay();
-            if (_routeMaterial != null)
-            {
-                UnityEngine.Object.Destroy(_routeMaterial);
-                _routeMaterial = null;
-            }
             base.OnDestroy();
         }
 
@@ -2115,15 +1976,17 @@ namespace CS2_JourneyPlanner
 
         private sealed class RoutePiece
         {
-            public GameObject Object;
-            public LineRenderer Line;
-            public Vector3[] OriginalPoints;
+            public Bezier4x3 Curve;
             public int JourneyStartIndex;
             public int JourneyEndIndex;
         }
 
         private sealed class JourneyLeg
         {
+            public float DistanceMeters;
+            public UnityEngine.Color RenderColor;
+            public string ColorHex;
+            public string RouteName;
             public string Key;
             public string Mode;
             public Entity RouteOwner;
@@ -2143,6 +2006,7 @@ namespace CS2_JourneyPlanner
             public Entity RouteOwner;
             public int RouteNumber;
             public int WaypointIndex;
+            public int ExitWaypointIndex;
         }
     }
 }

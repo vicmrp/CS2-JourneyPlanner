@@ -2,6 +2,10 @@
   <PropertyGroup>
     <Configurations>Debug;Release</Configurations>
     <TargetFramework>net48</TargetFramework>
+    <Version>1.2.0</Version>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <PathMap>$(MSBuildProjectDirectory)/..=/_/source</PathMap>
     <PublishConfigurationPath>Properties\PublishConfiguration.xml</PublishConfigurationPath>
   </PropertyGroup>
 
@@ -11,6 +15,7 @@
   <ItemGroup>
     <Reference Include="Game"><Private>false</Private></Reference>
     <Reference Include="Colossal.Core"><Private>false</Private></Reference>
+    <Reference Include="Colossal.Collections"><Private>false</Private></Reference>
     <Reference Include="Colossal.Logging"><Private>false</Private></Reference>
     <Reference Include="Colossal.IO.AssetDatabase"><Private>false</Private></Reference>
     <Reference Include="Colossal.Mathematics"><Private>false</Private></Reference>
@@ -33,7 +38,13 @@
     <None Include="$(ModTargetsFile)" Link="Properties\Mod.targets" />
   </ItemGroup>
 
-  <Target Name="BuildUI" AfterTargets="AfterBuild">
-    <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)\UI" />
+  <Target Name="ReleasePostProcessorConfig" AfterTargets="ModPostProcessorConfig" Condition="'$(Configuration)'=='Release'">
+    <PropertyGroup>
+      <ModPostProcessorArgs>"$(ModPostProcessorFullPath)" PostProcess "$(TargetPath)" -u "$(UnityModProjectFullPath)" @(ReferencePath->'-r "%(Identity)"', ' ') -p Windows</ModPostProcessorArgs>
+    </PropertyGroup>
+  </Target>
+  <Target Name="BuildUI" AfterTargets="DeployWIP">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(ProjectDir)\UI" />
+    <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)\UI" EnvironmentVariables="UVM_UI_OUTPUT=$(DeployDir)" />
   </Target>
 </Project>
