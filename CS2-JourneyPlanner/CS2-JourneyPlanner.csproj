@@ -47,4 +47,7 @@
     <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(ProjectDir)\UI" />
     <Exec Command="npm run build" WorkingDirectory="$(ProjectDir)\UI" EnvironmentVariables="UVM_UI_OUTPUT=$(DeployDir)" />
   </Target>
+  <Target Name="NormalizeNativeTimestamp" AfterTargets="RunModPostProcessor" Condition="'$(Configuration)'=='Release'">
+    <Exec Command="node &quot;$(ProjectDir)UI/tools/normalize-native.cjs&quot; &quot;$(OutDir)$(TargetName)_win_x86_64.dll&quot;" />
+  </Target>
 </Project>

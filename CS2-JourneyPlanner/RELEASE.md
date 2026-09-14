@@ -14,6 +14,8 @@ Here uvm means the CLI from https://vezit.net. The Release recipe includes the m
 
 UI output follows the isolated deployment directory when UVM builds. The normal dotnet build command deploys locally; close the game first. Do not regenerate or hand-edit the published package after hashing it.
 
+Git pins LF source line endings. After official Release postprocessing, the build automatically zeros the unsigned Windows Burst DLL's COFF timestamp; fresh builds otherwise differ only by the link time. The checked-in normalization script rejects unexpected PE layouts or signatures and changes no executable instructions. This transformation is part of the public build recipe, before packaging and hashing.
+
 ## Publication
 
 1. Run the geometry checks and test this exact release in-game.
